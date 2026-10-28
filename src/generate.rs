@@ -73,6 +73,17 @@ fn shortest(outlines: &[String]) -> Option<Vec<Stroke>> {
         .min_by_key(|o| (o.len(), keys(o)))
 }
 
+/// The shortest outline a dictionary has for a word that the other dictionary has too, failing
+/// that its shortest at all. Plover's `main.json` is full of misstrokes (`O` for *to*, `SP` for
+/// *and*); an outline both have is one people really write.
+fn known(own: Option<&Vec<String>>, other: Option<&Vec<String>>) -> Option<Vec<Stroke>> {
+    let own = own?;
+    let shared: Vec<String> = other
+        .map(|o| own.iter().filter(|x| o.contains(x)).cloned().collect())
+        .unwrap_or_default();
+    shortest(&shared).or_else(|| shortest(own))
+}
+
 /// How many keys an outline takes to press.
 pub fn keys(outline: &[Stroke]) -> u32 {
     outline.iter().map(|s| s.0.count_ones()).sum()
@@ -132,17 +143,11 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
             continue;
         }
         let source = briefs.word.get(word.as_str()).unwrap_or(&briefs.default);
+        let plover = setup.gold.plover.get(word.as_str());
+        let lapwing = setup.gold.lapwing.get(word.as_str());
         let outline = match source.as_str() {
-            "plover" => setup
-                .gold
-                .plover
-                .get(word.as_str())
-                .and_then(|o| shortest(o)),
-            "lapwing" => setup
-                .gold
-                .lapwing
-                .get(word.as_str())
-                .and_then(|o| shortest(o)),
+            "plover" => known(plover, lapwing),
+            "lapwing" => known(lapwing, plover),
             explicit => parse_outline(explicit),
         };
         // A word only one of them writes still gets its brief
@@ -274,14 +279,15 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
             .filter(|s| own < s.rank && first.len() > 1)
         {
             for sounds in &setup.pron[word.as_str()] {
-                for stroke in setup.rules.shorten(*short, word, sounds) {
+                for outline in setup.rules.shorten(*short, word, sounds) {
                     // Never an outline some word has by the rules: those stay theirs
-                    let text = render_outline(&[stroke]);
-                    if !simple.contains(&text)
+                    let text = render_outline(&outline);
+                    if outline.len() < first.len()
+                        && !simple.contains(&text)
                         && !wanted.contains(&text)
-                        && !options.iter().any(|(_, o)| o == &vec![stroke])
+                        && !options.iter().any(|(_, o)| o == &outline)
                     {
-                        options.push((Origin::Short(short.step), vec![stroke]));
+                        options.push((Origin::Short(short.step), outline));
                     }
                 }
             }
@@ -405,16 +411,16 @@ pub fn build(setup: &Setup, briefs: &Briefs, common: usize, out: &Path) -> Resul
         let best = ours.entry(entry.word.as_str()).or_insert(cost);
         *best = (*best).min(cost);
     }
-    let cost_of = |outlines: Option<&Vec<String>>| {
-        let outline = shortest(outlines?)?;
+    let cost_of = |own: Option<&Vec<String>>, other: Option<&Vec<String>>| {
+        let outline = known(own, other)?;
         Some((outline.len(), keys(&outline)))
     };
     let mut total = [0f64; 7];
     let mut worse: Vec<(f64, &str, u32, u32)> = Vec::new();
     for (word, &(strokes, key_count)) in &ours {
         let (Some(plover), Some(lapwing)) = (
-            cost_of(setup.gold.plover.get(*word)),
-            cost_of(setup.gold.lapwing.get(*word)),
+            cost_of(setup.gold.plover.get(*word), setup.gold.lapwing.get(*word)),
+            cost_of(setup.gold.lapwing.get(*word), setup.gold.plover.get(*word)),
         ) else {
             continue;
         };

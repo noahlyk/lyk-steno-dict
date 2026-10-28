@@ -27,11 +27,16 @@ written in Rust, with the rules as data. American English only.
 4. **Prefixes with keys of their own.** `ex-` is `KP` and `dis-` is `STK`; the keys join the
    next stroke's left hand: *expect* KPEBGT, *distance* STKUPBS.
 5. **Several syllables.** An unstressed syllable with a reduced vowel is not written: its
-   consonants join the stroke before it, in steno order (*living* HREUFG, *special* SPERBL,
-   *lately* HRAEUT/^-L). When they don't fit, the stem keeps the consonant it owns and the rest
-   is a continuation stroke on the right hand: *ended* EPBD/^-D, *breaking* PWRAEUBG/^-G,
-   *goodness* TKPWAOD/^-PBS, *better* PWET/^ER. Final `-ly` folds as `-L` after a single
-   consonant and is `^PHREU` after a cluster; any other final `y` is `^EU`, and a final `a` is a
+   consonants join the stroke before it, in steno order (*living* HREUFG, *special* SPERBL),
+   except that a lone `-er` or `-ly` may land out of order as in Plover (*better* PWERT,
+   *lately* HRAEULT, *color* KORL). When they don't fit, the stem keeps the consonant it owns
+   and the rest is a continuation stroke of consonants only on the right hand: *ended* EPBD/^-D,
+   *breaking* PWRAEUBG/^-G, *goodness* TKPWAOD/^-PBS, *harder* HARD/^-R, *confidence*
+   KOPB/^-FD/^-PBS. So the suffixes are a small fixed set that never needs memorising apart
+   from the rules: `^-G` ing, `^-D` ed, `^-S` s, `^-L` ly, `^-R` er, `^-PB` en, `^-FT` est,
+   `^-PBS` ness, `^-PLT` ment, `^-GS` tion, `^-BL` able. A join stroke carries a vowel only
+   when the suffix has no consonant. Final `-ly` is `^PHREU` after a cluster and a double `l`
+   (*silly* SEUL/^EU); any other final `y` is `^EU`, and a final `a` is a
    syllable of its own (*china* KHAOEU/^TPHA). Suffix clusters both dictionaries use are rules:
    `-ment` -PLT, `-tion` -GS, `-ting` -GT, `-ding` -GD, and Plover's F for an S before another
    consonant (*castle* KAFL, *lesson* HREFPB).
@@ -42,7 +47,11 @@ written in Rust, with the rules as data. American English only.
    on the first stroke, a star on the last, then one and two extra star strokes. A short form
    never takes an outline that a one-syllable word's own rules produce.
 7. **How short** (`[[brevity]]` in the rules). Each step is a transformation of the full outline
-   that can be done by hand, with a frequency rank below which words take it: `skeleton` is one
+   that can be done by hand, with a frequency rank below which words take it. `lead` drops an
+   unstressed first syllable that is only a vowel (*about* PWOUT, *again* TKPWEPB, *around*
+   ROUPBD); `lean` puts the consonants of an unstressed first syllable on the left hand of the
+   next stroke when they come first in steno order (*believe* PWHRAOEF, *deliver* TKHREUFR,
+   *complete* KPHRAOET). The one-stroke steps for long words: `skeleton` is one
    stroke of the first consonants and every consonant after the first vowel, `shell` keeps those
    of the stressed and last syllables, `ends` those of the last; each with or without the
    stressed vowel. An empty list gives a Lapwing-like dictionary, a stroke per syllable; a huge
@@ -61,24 +70,28 @@ the `KWR` or star they put on a continuation stroke, which the join key replaces
 | Syllables | Same as Plover or Lapwing | Plover | Lapwing |
 |---|---|---|---|
 | 1 | 90% | 78% | 83% |
-| 2 | 66% | 51% | 57% |
-| 3 | 41% | 28% | 34% |
+| 2 | 60% | 45% | 52% |
+| 3 | 39% | 26% | 33% |
 | 4+ | 24% | 17% | 19% |
 
-Longer words differ mostly where Plover and Lapwing have a brief. `mismatches --syllables N
+Longer words differ mostly where Plover and Lapwing have a brief, and where lyk writes a bare
+`^-R` for an `-er` they write `*ER`. `mismatches --syllables N
 --after 1500` lists what is left.
 
 `build` on the words all three dictionaries write, strokes and keys per word:
 
 | | Strokes | Keys |
 |---|---|---|
-| this | 1.042 | 3.715 |
-| Plover | 1.038 | 3.709 |
-| Lapwing | 1.040 | 4.115 |
+| this | 1.065 | 4.151 |
+| Plover | 1.051 | 4.085 |
+| Lapwing | 1.051 | 4.164 |
 
-That is with the join key on every continuation stroke counted. About 1,000 words end up with a
+That is with the join key on every continuation stroke counted, and with a Plover outline
+counted only when Lapwing has it too: Plover's `main.json` is full of misstrokes (`O` for *to*,
+`SP` for *and*) that would otherwise make it look a third of a key cheaper than it is. About
+1,200 words end up with a
 star form because another word sounds the same and has the plain outline (`site` and `sight`,
-`don` and `done`); `build` lists the commonest. 91 of the 30,000 words can't be written by these
+`don` and `done`); `build` lists the commonest. 93 of the 30,000 words can't be written by these
 rules yet, nearly all names and interjections (`hm`, `schmidt`, `vlad`).
 
 ## Use

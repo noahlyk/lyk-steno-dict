@@ -99,6 +99,7 @@ ER = "UR"
 "IY.e" = "E"
 "IY.y" = "EU"
 "IY.ly" = "EU"
+"IY.lly" = "EU"
 "OW.oa" = "AO"
 "OW.ed" = "OE"
 
@@ -324,6 +325,13 @@ contains = "o"
 # `-ly` at the end of a word of two or more syllables is not a syllable of its own: its L goes on
 # the stroke before (`nearly` TPHAOERL, `lately` HRAEULT). Any other final `y`, `ey` or `ie` is
 # the short vowel: `pity` PEUT/EU, `money` PHOPB/EU.
+# `silly`, `fully`, `belly`: with a double l the ending is a syllable of its own, HREU
+[[spelled]]
+sound = "IY"
+label = "IY.lly"
+ends = "lly"
+min_syllables = 2
+
 [[spelled]]
 sound = "IY"
 label = "IY.ly"
@@ -535,7 +543,7 @@ keys = "KP"
 
 [[prefix]]
 spelling = "dis"
-sounds = ["D IH0 S", "D IH1 S", "D IH2 S"]
+sounds = ["D IH0 S", "D IH1 S", "D IH2 S", "D IH0 Z"]
 keys = "STK"
 
 [reduce]
@@ -547,6 +555,8 @@ order = "strict"
 except = ["AH.a"]
 # Only reduced after a single consonant: `lately` HRAEUT/-L, but `assembly` A/SEPL/PWHREU
 lone = ["IY.ly"]
+# May land out of steno order when folded alone: `better` PWERT, `lately` HRAEULT
+loose = ["R", "L"]
 
 [theory]
 # lyk is steno with explicit word boundaries: every stroke after the first of a word carries the
@@ -559,6 +569,14 @@ join_key = true
 # to be (its place in the frequency list) to take it, and `vowel` whether the stressed vowel
 # stays. Words that take no step are written a stroke per syllable. Leave this empty for a
 # Lapwing-like dictionary; give every step a huge rank for the shortest one the rules allow.
+[[brevity]]
+step = "lead"       # an unstressed first syllable that is only a vowel is dropped: `about` PWOUT
+rank = 100000
+
+[[brevity]]
+step = "lean"       # its consonants go on the left hand of the next stroke: `believe` PWHRAOEF
+rank = 100000
+
 [[brevity]]
 step = "skeleton"   # one stroke: the first consonants, then every consonant after the first vowel
 rank = 8000

@@ -78,9 +78,6 @@ const fn two() -> usize {
 #[derive(Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum Step {
-    /// Only the stressed syllable keeps its vowel. Every other syllable is its consonants, folded
-    /// onto the stroke before when they fit, otherwise a vowelless stroke of its own.
-    Squeeze,
     /// One stroke: the consonants that start the word, then every consonant after its first vowel
     /// folded onto the right hand.
     Skeleton,
@@ -89,15 +86,21 @@ pub enum Step {
     Shell,
     /// One stroke: the consonants that start the word and those of the last syllable.
     Ends,
+    /// An unstressed first syllable that is only a vowel is dropped: `about` PWOUT.
+    Lead,
+    /// The consonants of an unstressed first syllable go on the left hand of the next stroke:
+    /// `believe` PWHRAOEF.
+    Lean,
 }
 
 impl std::fmt::Display for Step {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
-            Self::Squeeze => "squeeze",
             Self::Skeleton => "skeleton",
             Self::Shell => "shell",
             Self::Ends => "ends",
+            Self::Lead => "lead",
+            Self::Lean => "lean",
         })
     }
 }
@@ -127,6 +130,10 @@ struct RawReduce {
     /// `lately`, but `assembly` ends in a stroke of its own, PWHREU
     #[serde(default)]
     lone: Vec<String>,
+    /// Consonants that may land out of steno order when a syllable of only them is folded:
+    /// Plover's -RT for `-ter` (`better` PWERT) and -LT for `-tly` (`lately` HRAEULT)
+    #[serde(default)]
+    loose: Vec<String>,
 }
 
 #[derive(Deserialize, Default)]
@@ -236,6 +243,7 @@ pub struct Rules {
     reduce: HashSet<String>,
     keep: HashSet<String>,
     lone: HashSet<String>,
+    loose: HashSet<String>,
     /// Whether consonants joining the stroke before may land out of steno order
     fold_any: bool,
     join_key: bool,
@@ -261,6 +269,21 @@ fn plain(sound: &str) -> &str {
         .split('.')
         .next()
         .unwrap_or(sound)
+}
+
+/// A syllable written as a continuation stroke: if that stroke has no vowel keys, the syllable
+/// has no vowel either when more consonants fold onto it (`confidence` KOPB/-FD/-PBS).
+fn vowelless(mut syllable: Syllable, written: Stroke) -> Syllable {
+    if written.0 & (Stroke::VOWELS | Stroke::STAR) == 0 {
+        syllable.vowel = String::new();
+    }
+    // Written on the right hand, its consonants stay there
+    if written.0 & Stroke::LEFT == 0 {
+        let mut coda = std::mem::take(&mut syllable.onset);
+        coda.append(&mut syllable.coda);
+        syllable.coda = coda;
+    }
+    syllable
 }
 
 /// A sound without its spelling variant but with its stress: `UW.oo1` is `UW1`.
@@ -297,6 +320,7 @@ impl Rules {
             reduce: raw.reduce.vowels.into_iter().collect(),
             keep: raw.reduce.except.into_iter().collect(),
             lone: raw.reduce.lone.into_iter().collect(),
+            loose: raw.reduce.loose.into_iter().collect(),
             fold_any: match raw.reduce.order.as_deref() {
                 None | Some("any") => true,
                 Some("strict") => false,
@@ -385,12 +409,16 @@ impl Rules {
         let base = syllable
             .vowel
             .trim_end_matches(|c: char| c.is_ascii_digit());
-        let plain_vowel = self
-            .vowel
-            .get(&syllable.vowel)
-            .or_else(|| self.vowel.get(base))
-            .or_else(|| self.vowel.get(plain(base)))
-            .copied();
+        // A continuation stroke that became the stem of the next fold has no vowel
+        let plain_vowel = if syllable.vowel.is_empty() {
+            Some(Stroke(0))
+        } else {
+            self.vowel
+                .get(&syllable.vowel)
+                .or_else(|| self.vowel.get(base))
+                .or_else(|| self.vowel.get(plain(base)))
+                .copied()
+        };
         // The vowel and the consonant after it together (`AR`, `OPBG`) when the rules have that,
         // and the rest of the consonants fit after it; otherwise the vowel on its own
         let joined = syllable.coda.first().and_then(|first| {
@@ -478,7 +506,10 @@ impl Rules {
                 // never an S: `ous-ly`, not `ou-sly`
                 let take = if next == "IY.ly" {
                     let ends_in_l = cluster.last().is_some_and(|s| plain(s) == "L");
-                    let two = cluster.len() >= 2 && {
+                    let stressed = syllable.vowel.ends_with(['1', '2']);
+                    let keeps = stressed && self.lax.contains(plain(&syllable.vowel));
+                    // `ug-ly`: a stressed short vowel keeps its consonant here too
+                    let two = cluster.len() >= 2 && !(keeps && cluster.len() == 2) && {
                         let pair = &cluster[cluster.len() - 2..];
                         plain(&pair[0]) != "S"
                             && self.onsets.contains(&format!("{} L", plain(&pair[0])))
@@ -522,8 +553,8 @@ impl Rules {
         &self.brevity
     }
 
-    /// The one-stroke forms a shortening step gives a word of several syllables.
-    pub fn shorten(&self, step: Shortening, word: &str, sounds: &[String]) -> Vec<Stroke> {
+    /// The shorter outlines a shortening step gives a word of several syllables.
+    pub fn shorten(&self, step: Shortening, word: &str, sounds: &[String]) -> Vec<Vec<Stroke>> {
         let syllables = sounds
             .iter()
             .filter(|s| s.ends_with(|c: char| c.is_ascii_digit()))
@@ -531,11 +562,15 @@ impl Rules {
         if syllables < step.min_syllables {
             return Vec::new();
         }
-        self.skeletons(word, sounds)
-            .into_iter()
-            .filter(|(kind, vowel, _)| *kind == step.step && *vowel == step.vowel)
-            .map(|(_, _, stroke)| stroke)
-            .collect()
+        match step.step {
+            Step::Lead | Step::Lean => self.leading(step.step, word, sounds).into_iter().collect(),
+            Step::Skeleton | Step::Shell | Step::Ends => self
+                .skeletons(word, sounds)
+                .into_iter()
+                .filter(|(kind, vowel, _)| *kind == step.step && *vowel == step.vowel)
+                .map(|(_, _, stroke)| vec![stroke])
+                .collect(),
+        }
     }
 
     /// A word of several syllables as one stroke: the consonants that start it, then consonants
@@ -653,13 +688,18 @@ impl Rules {
     /// its consonants (`-G` for `-ing`, `-D` for `-ed`, `-PB` for `-en`). A reduced `ER` keeps its
     /// vowel keys (`ER`), and a syllable with no consonants keeps its vowel too.
     fn continuation(&self, syllable: &Syllable) -> Option<Stroke> {
+        let is_er = plain(&syllable.vowel) == "ER";
         let consonants = syllable.onset.len() + syllable.coda.len();
-        if plain(&syllable.vowel) == "ER" || consonants == 0 {
+        if consonants == 0 && !is_er {
             return self.syllable_stroke(syllable);
         }
-        // A suffix is written on the right hand (`-ness` -PBS, `-ment` -PLT); when its consonants
-        // don't fit there in order, the first go on the left (`-nial` TPH-L)
+        // A suffix is written on the right hand with no vowel (`-ness` -PBS, `-ment` -PLT, `-er`
+        // -R); when its consonants don't fit there in order, the first go on the left (`-nial`
+        // TPH-L)
         let mut all = syllable.onset.clone();
+        if is_er {
+            all.push("R".into());
+        }
         all.extend(syllable.coda.iter().cloned());
         if let Some(coda) = Self::consonants(&all, &self.coda, &self.coda_cluster, false) {
             return Some(coda);
@@ -706,20 +746,34 @@ impl Rules {
     fn outline_with(&self, word: &str, sounds: &[String], clash: bool) -> Option<Vec<Stroke>> {
         let labelled = self.label_with(word, sounds, clash);
         let (prefix, skip) = self.prefix(word, &labelled).unzip();
-        let mut syllables = self.syllables(&labelled[skip.unwrap_or(0)..])?;
+        let syllables = self.syllables(&labelled[skip.unwrap_or(0)..])?;
+        let mut strokes = self.strokes_for(&syllables)?;
+        if let Some(prefix) = prefix {
+            // The prefix keys join the first stroke's own left-hand keys, sharing any they both
+            // use: `KP` + `PEBGT` is `KPEBGT`, `STK` + `TAPBS` is `STKAPBS`
+            strokes.first_mut()?.0 |= prefix.0;
+        }
+        Some(strokes)
+    }
+
+    /// The strokes for a run of syllables, folding reduced ones onto the stroke before.
+    fn strokes_for(&self, syllables: &[Syllable]) -> Option<Vec<Stroke>> {
         let mut strokes: Vec<Stroke> = Vec::new();
         let mut previous: Option<Syllable> = None;
-        for syllable in syllables.drain(..) {
+        for syllable in syllables.iter().cloned() {
             if let Some(before) = &previous
                 && self.is_reduced(&syllable)
             {
                 let mut merged = before.clone();
-                merged.coda.extend(syllable.onset.iter().cloned());
+                let mut added: Vec<String> = syllable.onset.clone();
                 if plain(&syllable.vowel) == "ER" {
-                    merged.coda.push("R".into());
+                    added.push("R".into());
                 }
-                merged.coda.extend(syllable.coda.iter().cloned());
-                if let Some(stroke) = self.stroke_for(&merged, self.fold_any) {
+                added.extend(syllable.coda.iter().cloned());
+                // Some consonants may land out of order (Plover's -RT for `-ter`, -LT for `-tly`)
+                let loose = added.iter().all(|s| self.loose.contains(plain(s)));
+                merged.coda.extend(added);
+                if let Some(stroke) = self.stroke_for(&merged, self.fold_any || loose) {
                     *strokes.last_mut()? = stroke;
                     previous = Some(merged);
                     continue;
@@ -739,22 +793,55 @@ impl Rules {
                 {
                     *strokes.last_mut()? = stroke;
                     strokes.push(rest);
-                    previous = Some(suffix);
+                    previous = Some(vowelless(suffix, rest));
                     continue;
                 }
-                strokes.push(self.continuation(&syllable)?);
-                previous = Some(syllable);
+                let rest = self.continuation(&syllable)?;
+                strokes.push(rest);
+                previous = Some(vowelless(syllable, rest));
                 continue;
             }
             strokes.push(self.syllable_stroke(&syllable)?);
             previous = Some(syllable);
         }
-        if let Some(prefix) = prefix {
-            // The prefix keys join the first stroke's own left-hand keys, sharing any they both
-            // use: `KP` + `PEBGT` is `KPEBGT`, `STK` + `TAPBS` is `STKAPBS`
-            strokes.first_mut()?.0 |= prefix.0;
-        }
         Some(strokes)
+    }
+
+    /// The outlines the `lead` and `lean` steps give a word: an unstressed first syllable is not
+    /// written as a syllable. `lead` drops one that is only a vowel (`about` PWOUT, `again`
+    /// TKPWEPB); `lean` puts the consonants of one onto the left hand of the next stroke when
+    /// they come before its own keys (`believe` PWHRAOEF, `deliver` TKHREUFR).
+    fn leading(&self, step: Step, word: &str, sounds: &[String]) -> Option<Vec<Stroke>> {
+        let labelled = self.label(word, sounds);
+        if self.prefix(word, &labelled).is_some() {
+            return None;
+        }
+        let syllables = self.syllables(&labelled)?;
+        let first = syllables.first()?;
+        if syllables.len() < 2 || !first.vowel.ends_with('0') {
+            return None;
+        }
+        let mut consonants = first.onset.clone();
+        consonants.extend(first.coda.iter().cloned());
+        let mut rest = self.strokes_for(&syllables[1..])?;
+        match step {
+            Step::Lead if consonants.is_empty() => Some(rest),
+            Step::Lean if !consonants.is_empty() => {
+                let keys = Self::consonants(&consonants, &self.onset, &self.onset_cluster, false)?;
+                let next = rest.first_mut()?;
+                let own = Stroke(next.0 & Stroke::LEFT);
+                let in_order = match (keys.highest(), own.lowest()) {
+                    (Some(high), Some(low)) => high <= low,
+                    _ => true,
+                };
+                if !in_order {
+                    return None;
+                }
+                next.0 |= keys.0;
+                Some(rest)
+            }
+            _ => None,
+        }
     }
 
     /// Mark the strokes after the first of a word with the join key, if the theory has one.
@@ -810,14 +897,16 @@ mod tests {
         assert_eq!(write("ended", "EH1 N D AH0 D"), "EPBD/-D");
         assert_eq!(write("breaking", "B R EY1 K IH0 NG"), "PWRAEUBG/-G");
         assert_eq!(write("hidden", "HH IH1 D AH0 N"), "HEUD/-PB");
-        // A reduced `er` keeps its vowel keys
-        assert_eq!(write("harder", "HH AA1 R D ER0"), "HARD/ER");
+        // A reduced `er` that does not fold is -R alone
+        assert_eq!(write("harder", "HH AA1 R D ER0"), "HARD/-R");
     }
 
     #[test]
     fn consonants_only_join_the_stroke_before_in_steno_order() {
         assert_eq!(write("goodness", "G UH1 D N AH0 S"), "TKPWAOD/-PBS");
-        assert_eq!(write("lately", "L EY1 T L IY0"), "HRAEUT/-L");
+        // Except a lone L or R, which may land before the stem's last key as in Plover
+        assert_eq!(write("lately", "L EY1 T L IY0"), "HRAEULT");
+        assert_eq!(write("color", "K AH1 L ER0"), "KORL");
     }
 
     #[test]
@@ -849,8 +938,7 @@ mod tests {
     #[test]
     fn a_stressed_short_vowel_keeps_a_consonant() {
         assert_eq!(write("every", "EH1 V R IY0"), "EF/REU");
-        // The folded R would land before the T, so `-er` is a stroke of its own
-        assert_eq!(write("better", "B EH1 T ER0"), "PWET/ER");
+        assert_eq!(write("better", "B EH1 T ER0"), "PWERT");
     }
 
     #[test]
