@@ -6,6 +6,7 @@
 mod analysis;
 mod data;
 mod fetch;
+mod generate;
 mod gold;
 mod rules;
 mod stroke;
@@ -63,6 +64,18 @@ enum Command {
     },
     /// Show how the rules write a word
     Explain { word: String },
+    /// Build the dictionary: briefs first, then the rules, and say what it costs to type
+    Build {
+        /// Where to write the Plover JSON dictionary
+        #[arg(long, default_value = "out/lyk.json")]
+        out: PathBuf,
+        /// Words to cover, most common first
+        #[arg(long, default_value_t = 30_000)]
+        common: usize,
+        /// Briefs to use instead of the built-in ones
+        #[arg(long)]
+        briefs: Option<PathBuf>,
+    },
 }
 
 fn main() -> Result<()> {
@@ -80,5 +93,17 @@ fn main() -> Result<()> {
         } => analysis::mismatches(&setup()?, *syllables, *limit, *missing, *after),
         Command::Learn { min, limit } => analysis::learn(&setup()?, *min, *limit),
         Command::Explain { word } => analysis::explain(&setup()?, word),
+        Command::Build {
+            out,
+            common,
+            briefs,
+        } => {
+            let setup = setup()?;
+            let briefs = match briefs {
+                Some(path) => generate::Briefs::load(path)?,
+                None => generate::Briefs::built_in()?,
+            };
+            generate::build(&setup, &briefs, *common, out)
+        }
     }
 }

@@ -1,0 +1,12 @@
+# Common words keep the short outlines people already know. They are pinned before the rules run,
+# and nothing generated can take their strokes.
+
+# How many of the most common words get a brief
+count = 1500
+
+# Where a word's brief comes from unless it says otherwise: "plover" or "lapwing"
+default = "plover"
+
+# Per word: a source, or the outline itself. For example `he = "plover"` (HE, not HAOE) or
+# `the = "-T"`.
+[word]

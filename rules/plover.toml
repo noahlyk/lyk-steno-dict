@@ -116,6 +116,7 @@ ER = "UR"
 "S P" = "-FP"
 "N CH" = "-FRPB"
 "S T.ed" = "-FD"
+"SH.tion N" = "-GS"
 
 # Runs of consonants English allows at the start of a syllable. Used to decide where a syllable
 # ends in the middle of a word: the longest of these that fits goes to the next syllable.
@@ -251,6 +252,19 @@ min_syllables = 2
 
 # An unstressed syllable with one of these vowels does not get a vowel: its consonants go on the
 # stroke before it, as in `couple` KUPL, `living` HREUFG, `special` SPERBL.
+# `-tion` and `-sion`: the sounds SH and N at the end are two keys, -GS
+[[spelled]]
+sound = "SH"
+label = "SH.tion"
+contains = "tion"
+min_syllables = 2
+
+[[spelled]]
+sound = "SH"
+label = "SH.tion"
+contains = "sion"
+min_syllables = 2
+
 [reduce]
 vowels = ["AH", "IH", "ER"]
 
@@ -258,3 +272,7 @@ vowels = ["AH", "IH", "ER"]
 # Strokes after the first of a word carry a join key, so they can be short and never clash with
 # a word of their own.
 join_key = false
+
+# The commonest long words may be a single stroke of their consonants (the fewest keys). Words
+# less common than this rank are written syllable by syllable.
+skeleton_rank = 8000

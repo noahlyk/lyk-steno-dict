@@ -14,6 +14,8 @@ pub struct Setup {
     pub gold: Gold,
     /// 0 is the most common word
     pub rank: HashMap<String, usize>,
+    /// How often each word is said
+    pub count: HashMap<String, u64>,
 }
 
 impl Setup {
@@ -24,7 +26,9 @@ impl Setup {
         };
         let frequency = load_frequency(&data.join("frequency/en_full.txt"))?;
         let mut rank = HashMap::new();
-        for (n, (word, _)) in frequency.into_iter().enumerate() {
+        let mut count = HashMap::new();
+        for (n, (word, times)) in frequency.into_iter().enumerate() {
+            count.entry(word.clone()).or_insert(times);
             rank.entry(word).or_insert(n);
         }
         Ok(Self {
@@ -32,6 +36,7 @@ impl Setup {
             pron: load_cmudict(&data.join("pronunciation/cmudict.dict"))?,
             gold: Gold::load(data)?,
             rank,
+            count,
         })
     }
 

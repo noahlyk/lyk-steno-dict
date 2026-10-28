@@ -66,10 +66,6 @@ impl Stroke {
     pub const fn is_empty(self) -> bool {
         self.0 == 0
     }
-
-    pub const fn has(self, bits: u32) -> bool {
-        self.0 & bits != 0
-    }
 }
 
 impl fmt::Display for Stroke {

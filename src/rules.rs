@@ -45,6 +45,9 @@ struct RawTheory {
     /// Strokes after the first of a word carry a join key
     #[serde(default)]
     join_key: bool,
+    /// Words up to this frequency rank may be written as a single skeleton stroke
+    #[serde(default)]
+    skeleton_rank: usize,
 }
 
 #[derive(Deserialize, Default)]
@@ -111,6 +114,7 @@ pub struct Rules {
     spelled: Vec<Spelled>,
     reduce: HashSet<String>,
     join_key: bool,
+    skeleton_rank: usize,
 }
 
 fn strokes(table: HashMap<String, String>, what: &str) -> Result<HashMap<String, Stroke>> {
@@ -160,6 +164,7 @@ impl Rules {
             spelled: raw.spelled,
             reduce: raw.reduce.vowels.into_iter().collect(),
             join_key: raw.theory.join_key,
+            skeleton_rank: raw.theory.skeleton_rank,
         })
     }
 
@@ -319,6 +324,108 @@ impl Rules {
             .unwrap_or(0)
     }
 
+    /// Words up to this frequency rank may be written as one skeleton stroke.
+    pub const fn skeleton_rank(&self) -> usize {
+        self.skeleton_rank
+    }
+
+    /// A word of several syllables as one stroke: the consonants that start it, then every
+    /// consonant after its first vowel folded onto the right hand in order, and no vowels. A
+    /// second form keeps the stressed vowel. The fewest keys a word can take, and the first thing
+    /// tried for the commonest words.
+    pub fn skeletons(&self, word: &str, sounds: &[String]) -> Vec<Stroke> {
+        let Some(syllables) = self.syllables(&self.label(word, sounds)) else {
+            return Vec::new();
+        };
+        if syllables.len() < 2 {
+            return Vec::new();
+        }
+        let Some(onset) =
+            Self::consonants(&syllables[0].onset, &self.onset, &self.onset_cluster, false)
+        else {
+            return Vec::new();
+        };
+        // The consonants of a syllable, in order, with the `R` a reduced `ER` hides
+        let consonants_of = |syllable: &Syllable, with_onset: bool| -> Vec<String> {
+            let mut sounds: Vec<String> = Vec::new();
+            if with_onset {
+                sounds.extend(syllable.onset.iter().cloned());
+            }
+            if plain(&syllable.vowel) == "ER" {
+                sounds.push("R".into());
+            }
+            sounds.extend(syllable.coda.iter().cloned());
+            sounds
+        };
+        let last = syllables.len() - 1;
+        let stress = syllables
+            .iter()
+            .position(|s| s.vowel.ends_with('1'))
+            .unwrap_or(0);
+        // From the most to the fewest consonants kept: all of them, then those of the stressed
+        // and last syllables, then those of the last syllable only
+        let mut choices: Vec<Vec<String>> = Vec::new();
+        let first_coda = consonants_of(&syllables[0], false);
+        let mut all = first_coda.clone();
+        for syllable in &syllables[1..] {
+            all.extend(consonants_of(syllable, true));
+        }
+        choices.push(all);
+        let mut some = if stress == 0 {
+            first_coda.clone()
+        } else {
+            Vec::new()
+        };
+        if stress > 0 {
+            some.extend(consonants_of(&syllables[stress], true));
+        }
+        if last > stress {
+            some.extend(consonants_of(&syllables[last], true));
+        }
+        choices.push(some);
+        choices.push(consonants_of(&syllables[last], true));
+
+        // The vowel of the syllable with the main stress
+        let key = syllables[stress].vowel.as_str();
+        let vowel = self
+            .vowel
+            .get(key)
+            .or_else(|| {
+                self.vowel
+                    .get(key.trim_end_matches(|c: char| c.is_ascii_digit()))
+            })
+            .or_else(|| self.vowel.get(plain(key)))
+            .copied();
+
+        let mut found: Vec<Stroke> = Vec::new();
+        for rest in choices {
+            let Some(coda) = Self::consonants(&rest, &self.coda, &self.coda_cluster, true) else {
+                continue;
+            };
+            if coda.is_empty() {
+                continue;
+            }
+            let bare = Stroke(onset.0 | coda.0);
+            let mut forms = vec![bare];
+            if let Some(vowel) = vowel
+                && vowel.0 & coda.0 & Stroke::STAR == 0
+            {
+                forms.push(Stroke(bare.0 | vowel.0));
+            }
+            for form in forms {
+                if !found.contains(&form) {
+                    found.push(form);
+                }
+            }
+        }
+        found
+    }
+
+    /// Whether strokes after the first of a word carry the join key.
+    pub const fn join_key(&self) -> bool {
+        self.join_key
+    }
+
     /// Whether a syllable is one whose vowel is not written.
     fn is_reduced(&self, syllable: &Syllable) -> bool {
         syllable.vowel.ends_with('0') && self.reduce.contains(plain(&syllable.vowel))
@@ -356,5 +463,53 @@ impl Rules {
             }
         }
         Some(strokes)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::stroke::render_outline;
+
+    fn sounds(text: &str) -> Vec<String> {
+        text.split_whitespace().map(str::to_owned).collect()
+    }
+
+    fn write(word: &str, text: &str) -> String {
+        Rules::built_in()
+            .unwrap()
+            .outline(word, &sounds(text))
+            .map_or_else(|| "-".to_owned(), |o| render_outline(&o))
+    }
+
+    #[test]
+    fn a_syllable_is_its_onset_vowel_and_coda() {
+        assert_eq!(write("cat", "K AE1 T"), "KAT");
+        assert_eq!(write("stop", "S T AA1 P"), "STOP");
+        assert_eq!(write("dog", "D AO1 G"), "TKOG");
+    }
+
+    #[test]
+    fn spelling_picks_between_ways_to_write_a_sound() {
+        // The same vowel is two keys written `oo` and three written `u`
+        assert_eq!(write("moon", "M UW1 N"), "PHAOPB");
+        assert_eq!(write("tune", "T UW1 N"), "TAOUPB");
+        assert_eq!(write("when", "W EH1 N"), "WHEPB");
+    }
+
+    #[test]
+    fn an_unstressed_syllable_joins_the_stroke_before_it() {
+        assert_eq!(write("living", "L IH1 V IH0 NG"), "HREUFG");
+        assert_eq!(write("special", "S P EH1 SH AH0 L"), "SPERBL");
+    }
+
+    #[test]
+    fn a_long_word_can_be_one_skeleton_stroke() {
+        let rules = Rules::built_in().unwrap();
+        let skeletons = rules.skeletons("condition", &sounds("K AH0 N D IH1 SH AH0 N"));
+        // The consonants alone first, then with the stressed vowel
+        assert!(skeletons.len() >= 2, "{skeletons:?}");
+        assert!(skeletons[0].0 & (Stroke::VOWELS | Stroke::STAR) == 0);
+        assert!(skeletons[1].0 & Stroke::VOWELS != 0);
     }
 }
