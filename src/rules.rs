@@ -112,6 +112,13 @@ struct RawReduce {
     /// (`strict`), writing a continuation stroke otherwise
     #[serde(default)]
     order: Option<String>,
+    /// Variants of those vowels that are written after all: a final `a` (`china` KHAOEU/TPHA)
+    #[serde(default)]
+    except: Vec<String>,
+    /// Variants only reduced when a single consonant starts the syllable: `-ly` folds as -L in
+    /// `lately`, but `assembly` ends in a stroke of its own, PWHREU
+    #[serde(default)]
+    lone: Vec<String>,
 }
 
 #[derive(Deserialize, Default)]
@@ -213,6 +220,8 @@ pub struct Rules {
     lax: HashSet<String>,
     spelled: Vec<Spelled>,
     reduce: HashSet<String>,
+    keep: HashSet<String>,
+    lone: HashSet<String>,
     /// Whether consonants joining the stroke before may land out of steno order
     fold_any: bool,
     join_key: bool,
@@ -272,6 +281,8 @@ impl Rules {
             lax: raw.syllables.lax.into_iter().collect(),
             spelled: raw.spelled,
             reduce: raw.reduce.vowels.into_iter().collect(),
+            keep: raw.reduce.except.into_iter().collect(),
+            lone: raw.reduce.lone.into_iter().collect(),
             fold_any: match raw.reduce.order.as_deref() {
                 None | Some("any") => true,
                 Some("strict") => false,
@@ -447,7 +458,24 @@ impl Rules {
                 syllable.coda = sounds[v + 1..].to_vec();
             } else {
                 let cluster = &sounds[v + 1..vowels[n + 1]];
-                let take = self.onset_length(&syllable.vowel, cluster);
+                let next = sounds[vowels[n + 1]].trim_end_matches(|c: char| c.is_ascii_digit());
+                // The `-ly` ending takes its L and a stop before it (`sim-ply`, `as-sem-bly`),
+                // never an S: `ous-ly`, not `ou-sly`
+                let take = if next == "IY.ly" {
+                    let ends_in_l = cluster.last().is_some_and(|s| plain(s) == "L");
+                    let two = cluster.len() >= 2 && {
+                        let pair = &cluster[cluster.len() - 2..];
+                        plain(&pair[0]) != "S"
+                            && self.onsets.contains(&format!("{} L", plain(&pair[0])))
+                    };
+                    match (ends_in_l, two) {
+                        (true, true) => 2,
+                        (true, false) => 1,
+                        _ => 0,
+                    }
+                } else {
+                    self.onset_length(&syllable.vowel, cluster)
+                };
                 let split = cluster.len() - take;
                 syllable.coda = cluster[..split].to_vec();
                 onset = cluster[split..].to_vec();
@@ -493,10 +521,12 @@ impl Rules {
     /// consonants depends on the step: all of them, those of the stressed and last syllables, or
     /// those of the last syllable only.
     pub fn skeletons(&self, word: &str, sounds: &[String]) -> Vec<(Step, bool, Stroke)> {
-        let Some(syllables) = self.syllables(&self.label(word, sounds)) else {
+        let labelled = self.label(word, sounds);
+        let (prefix, skip) = self.prefix(word, &labelled).unzip();
+        let Some(syllables) = self.syllables(&labelled[skip.unwrap_or(0)..]) else {
             return Vec::new();
         };
-        if syllables.len() < 2 {
+        if syllables.len() + usize::from(prefix.is_some()) < 2 {
             return Vec::new();
         }
         let Some(onset) =
@@ -504,6 +534,7 @@ impl Rules {
         else {
             return Vec::new();
         };
+        let onset = Stroke(onset.0 | prefix.map_or(0, |p| p.0));
         // The consonants of a syllable, in order, with the `R` a reduced `ER` hides
         let consonants_of = |syllable: &Syllable, with_onset: bool| -> Vec<String> {
             let mut sounds: Vec<String> = Vec::new();
@@ -586,6 +617,8 @@ impl Rules {
             .vowel
             .trim_end_matches(|c: char| c.is_ascii_digit());
         syllable.vowel.ends_with('0')
+            && !self.keep.contains(label)
+            && (syllable.onset.len() == 1 || !self.lone.contains(label))
             && (self.reduce.contains(label) || self.reduce.contains(plain(label)))
     }
 

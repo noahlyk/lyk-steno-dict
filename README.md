@@ -30,8 +30,11 @@ written in Rust, with the rules as data. American English only.
    consonants join the stroke before it, in steno order (*living* HREUFG, *special* SPERBL,
    *lately* HRAEUT/^-L). When they don't fit, the stem keeps the consonant it owns and the rest
    is a continuation stroke on the right hand: *ended* EPBD/^-D, *breaking* PWRAEUBG/^-G,
-   *goodness* TKPWAOD/^-PBS, *better* PWET/^ER. Final `-ly` folds as `-L`; any other final `y`
-   is `^EU`.
+   *goodness* TKPWAOD/^-PBS, *better* PWET/^ER. Final `-ly` folds as `-L` after a single
+   consonant and is `^PHREU` after a cluster; any other final `y` is `^EU`, and a final `a` is a
+   syllable of its own (*china* KHAOEU/^TPHA). Suffix clusters both dictionaries use are rules:
+   `-ment` -PLT, `-tion` -GS, `-ting` -GT, `-ding` -GD, and Plover's F for an S before another
+   consonant (*castle* KAFL, *lesson* HREFPB).
 6. **Words that sound the same** are settled in this order. First the briefs. Then the spelling
    decides: `sail` (`ai`) keeps the full vowel `SAEUL`, and `sale` (silent e) takes the short
    one `SAEL`, whichever is commoner; the same for `ea` against `ee`, `oa` against `o-e`, and
@@ -44,7 +47,8 @@ written in Rust, with the rules as data. American English only.
    of the stressed and last syllables, `ends` those of the last; each with or without the
    stressed vowel. An empty list gives a Lapwing-like dictionary, a stroke per syllable; a huge
    rank on every step gives the shortest one the rules allow. Words that take no step are written
-   by rule 5.
+   by rule 5. A short form never takes an outline that any word has by the rules, so the forms a
+   learner can work out stay theirs.
 8. **Judged by cost.** `build` prints how many strokes and keys a word takes on average, weighted
    by how often it is said, next to Plover and Lapwing on the same words.
 
@@ -57,9 +61,9 @@ the `KWR` or star they put on a continuation stroke, which the join key replaces
 | Syllables | Same as Plover or Lapwing | Plover | Lapwing |
 |---|---|---|---|
 | 1 | 90% | 78% | 83% |
-| 2 | 61% | 48% | 51% |
-| 3 | 36% | 26% | 29% |
-| 4+ | 21% | 15% | 16% |
+| 2 | 66% | 51% | 57% |
+| 3 | 41% | 28% | 34% |
+| 4+ | 24% | 17% | 19% |
 
 Longer words differ mostly where Plover and Lapwing have a brief. `mismatches --syllables N
 --after 1500` lists what is left.
@@ -68,13 +72,13 @@ Longer words differ mostly where Plover and Lapwing have a brief. `mismatches --
 
 | | Strokes | Keys |
 |---|---|---|
-| this | 1.044 | 3.724 |
+| this | 1.042 | 3.715 |
 | Plover | 1.038 | 3.709 |
 | Lapwing | 1.040 | 4.115 |
 
-That is with the join key on every continuation stroke counted. About 1,100 words end up with a
+That is with the join key on every continuation stroke counted. About 1,000 words end up with a
 star form because another word sounds the same and has the plain outline (`site` and `sight`,
-`don` and `done`); `build` lists the commonest. 105 of the 30,000 words can't be written by these
+`don` and `done`); `build` lists the commonest. 91 of the 30,000 words can't be written by these
 rules yet, nearly all names and interjections (`hm`, `schmidt`, `vlad`).
 
 ## Use

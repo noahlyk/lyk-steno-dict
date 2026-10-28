@@ -211,18 +211,8 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
             simple.insert(text);
         }
     }
-    // How common the commonest word is that would have each outline by the rules
-    let wanted: HashMap<&String, usize> = groups
-        .iter()
-        .map(|(text, members)| {
-            let rank = members
-                .iter()
-                .map(|w| setup.rank[*w])
-                .min()
-                .unwrap_or(usize::MAX);
-            (text, rank)
-        })
-        .collect();
+    // The outlines some word has by the rules
+    let wanted: HashSet<&String> = groups.keys().collect();
     let mut spelled: HashSet<String> = HashSet::new();
     for members in groups.values().filter(|m| m.len() > 1) {
         for word in members {
@@ -234,7 +224,7 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
             };
             setup.rules.joined(&mut outline);
             let text = render_outline(&outline);
-            if taken.contains_key(&text) || wanted.contains_key(&text) {
+            if taken.contains_key(&text) || wanted.contains(&text) {
                 continue;
             }
             taken.insert(text, (*word).to_owned());
@@ -271,10 +261,10 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
         for short in setup.rules.brevity().iter().filter(|s| own < s.rank) {
             for sounds in &setup.pron[word.as_str()] {
                 for stroke in setup.rules.shorten(*short, word, sounds) {
-                    // Not an outline a word at least as common would have by the rules
-                    let theirs = wanted.get(&render_outline(&[stroke])).copied();
-                    if !simple.contains(&render_outline(&[stroke]))
-                        && theirs.is_none_or(|rank| rank > own)
+                    // Never an outline some word has by the rules: those stay theirs
+                    let text = render_outline(&[stroke]);
+                    if !simple.contains(&text)
+                        && !wanted.contains(&text)
                         && !options.iter().any(|(_, o)| o == &vec![stroke])
                     {
                         options.push((Origin::Short(short.step), vec![stroke]));
@@ -292,7 +282,10 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
             setup.rules.joined(&mut outline);
             let text = render_outline(&outline);
             if let Some(holder) = taken.get(&text) {
-                lost_to.get_or_insert_with(|| holder.clone());
+                // Who has the outline the rules give this word (not one of its short forms)
+                if origin == Origin::Rules {
+                    lost_to = Some(holder.clone());
+                }
             } else {
                 taken.insert(text, (*word).clone());
                 let lost_to = if matches!(origin, Origin::Ladder(_)) {

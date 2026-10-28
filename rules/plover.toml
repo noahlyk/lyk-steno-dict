@@ -91,12 +91,14 @@ ER = "UR"
 "ER.ear" = "ER"
 "UH.u" = "U"
 "UH.o" = "O"
+"UH.ur" = "U"
 "AH.a" = "A"
 "AA.aw" = "AU"
 "AO.a" = "AU"
 "IH.e" = "E"
 "IY.e" = "E"
 "IY.y" = "EU"
+"IY.ly" = "EU"
 "OW.oa" = "AO"
 "OW.ed" = "OE"
 
@@ -110,6 +112,7 @@ ER = "UR"
 "AY R" = "AOEUR"
 "AW R" = "OUR"
 "UH R" = "AOUR"
+"UH.ur R" = "UR"
 "UW R" = "AOUR"
 "AO NG" = "OPBG"
 "AO.a R" = "AR"
@@ -171,7 +174,22 @@ ER = "UR"
 "L M" = "-PL"
 "L K" = "-LG"
 "L B" = "-BL"
-"SH.tion N" = "-GS"
+# `-tion`, `-sion`, `-cian`, `-cean`: the SH and N of a reduced syllable are -GS
+"SH N" = "-GS"
+"ZH N" = "-GS"
+# `-ment` is -PLT, the N in the keys of the M
+"M N T" = "-PLT"
+# Plover's F for an S or Z before another consonant: `castle` KAFL, `lesson` HR-FPB
+"S L" = "-FL"
+"S N" = "-FPB"
+"Z N" = "-FPB"
+"S M" = "-FPL"
+"Z M" = "-FPL"
+# `-zes` is -SZ like `-ses`
+"Z Z" = "-SZ"
+# `-ting` and `-ding`: the G of the ending goes before the T or D, as Plover and Lapwing do
+"T NG.ing" = "-GT"
+"D NG.ing" = "-GD"
 
 # Runs of consonants English allows at the start of a syllable. Used to decide where a syllable
 # ends in the middle of a word: the longest of these that fits goes to the next syllable.
@@ -319,6 +337,26 @@ min_syllables = 2
 
 [[spelled]]
 sound = "IY"
+label = "IY.y"
+ends = "ies"
+min_syllables = 2
+
+# A final `a` is its own stroke: `china` KHAOEUPB/A
+[[spelled]]
+sound = "AH"
+label = "AH.a"
+ends = "a"
+min_syllables = 2
+
+# `jury`, `during`, `curious`: `ur` before another vowel is UR; `sure`, `pure` keep AOUR
+[[spelled]]
+sound = "UH"
+label = "UH.ur"
+contains = "ur"
+unless = ["ure"]
+
+[[spelled]]
+sound = "IY"
 label = "IY.ea"
 contains = "ea"
 clash = true
@@ -445,19 +483,6 @@ min_syllables = 2
 
 # An unstressed syllable with one of these vowels does not get a vowel: its consonants go on the
 # stroke before it, as in `couple` KUPL, `living` HREUFG, `special` SPERBL.
-# `-tion` and `-sion`: the sounds SH and N at the end are two keys, -GS
-[[spelled]]
-sound = "SH"
-label = "SH.tion"
-contains = "tion"
-min_syllables = 2
-
-[[spelled]]
-sound = "SH"
-label = "SH.tion"
-contains = "sion"
-min_syllables = 2
-
 # Words that sound the same are told apart by their spelling. `sail` (`ai`) keeps the full vowel;
 # `sale`, with a silent e and no `ai` or `ay`, moves to the short one; so do `weight` and `they`.
 [[spelled]]
@@ -516,6 +541,10 @@ vowels = ["AH", "IH", "ER", "IY.ly", "OW.ed"]
 # Whether the consonants joining the stroke before may land out of steno order (`any`: `lately`
 # HRAEULT) or only in order (`strict`), with a continuation stroke otherwise
 order = "strict"
+# Variants of those vowels that are written after all: a final `a` is its own syllable
+except = ["AH.a"]
+# Only reduced after a single consonant: `lately` HRAEUT/-L, but `assembly` A/SEPL/PWHREU
+lone = ["IY.ly"]
 
 [theory]
 # lyk is steno with explicit word boundaries: every stroke after the first of a word carries the
