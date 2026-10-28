@@ -1,0 +1,260 @@
+# Plover theory as rules: where each sound goes on the keyboard.
+#
+# Sounds are ARPAbet (as in CMUdict). Strokes are Plover notation. A `-` starts the right hand
+# when there is no vowel, and a star counts with the vowels.
+
+# Consonants at the start of a syllable (left hand)
+[onset]
+P = "P"
+B = "PW"
+T = "T"
+D = "TK"
+K = "K"
+G = "TKPW"
+M = "PH"
+N = "TPH"
+F = "TP"
+V = "SR"
+TH = "TH"
+DH = "TH"
+S = "S"
+Z = "STKPW"
+SH = "SH"
+ZH = "SKWR"
+CH = "KH"
+JH = "SKWR"
+HH = "H"
+L = "HR"
+R = "R"
+W = "W"
+Y = "KWR"
+"W.wh" = "WH"
+"R.wr" = "WR"
+
+# Consonants at the end of a syllable (right hand)
+[coda]
+P = "-P"
+B = "-B"
+T = "-T"
+D = "-D"
+K = "-BG"
+G = "-G"
+M = "-PL"
+N = "-PB"
+NG = "-PBG"
+F = "-F"
+V = "-F"
+TH = "*T"
+DH = "*T"
+S = "-S"
+Z = "-Z"
+SH = "-RB"
+ZH = "-RB"
+CH = "-FP"
+JH = "-PBLG"
+L = "-L"
+R = "-R"
+"Z.s" = "-S"
+"NG.ing" = "-G"
+"T.ed" = "-D"
+
+# Vowels. A name with a stress digit (`AH0`) is only used for that stress.
+[vowel]
+IY = "AOE"
+IH = "EU"
+EY = "AEU"
+EH = "E"
+AE = "A"
+AA = "O"
+AH = "U"
+AO = "AU"
+OW = "OE"
+UH = "AO"
+UW = "AOU"
+AY = "AOEU"
+AW = "OU"
+OY = "OEU"
+ER = "UR"
+"UW.oo" = "AO"
+"UW.ew" = "U"
+"ER.er" = "ER"
+"ER.ir" = "EUR"
+"AO.o" = "O"
+"IY.ea" = "AE"
+"AA.al" = "AU"
+"AA.a" = "A"
+"AH.o" = "O"
+"ER.or" = "OR"
+"ER.ear" = "ER"
+"UH.u" = "U"
+
+# A vowel and the consonant after it that go on the keys together: `AA R` is the A and -R of `car`.
+[vowel_coda]
+"EH R" = "AEUR"
+"IH R" = "AOER"
+"IY R" = "AOER"
+"AO R" = "OR"
+"AA R" = "AR"
+"AY R" = "AOEUR"
+"AW R" = "OUR"
+"UH R" = "AOUR"
+"UW R" = "AOUR"
+"AO NG" = "OPBG"
+"IY.ea R" = "AER"
+"IH.ea R" = "AER"
+
+# A run of consonants at the start of a syllable that is not just the keys one after the other
+[onset_cluster]
+
+# A run of consonants at the end of a syllable that is not just the keys one after the other.
+# Plover folds some of these onto a star.
+[coda_cluster]
+"NG K" = "*PBG"
+"M P" = "*PL"
+"S T" = "-FT"
+"S K" = "-FBG"
+"S P" = "-FP"
+"N CH" = "-FRPB"
+"S T.ed" = "-FD"
+
+# Runs of consonants English allows at the start of a syllable. Used to decide where a syllable
+# ends in the middle of a word: the longest of these that fits goes to the next syllable.
+[syllables]
+onsets = [
+    "P", "B", "T", "D", "K", "G", "M", "N", "F", "V", "TH", "DH", "S", "Z", "SH", "ZH", "CH", "JH",
+    "HH", "L", "R", "W", "Y",
+    "P R", "P L", "P Y", "B R", "B L", "B Y", "T R", "T W", "T Y", "D R", "D W", "D Y", "K R", "K L", "K W", "K Y",
+    "G R", "G L", "G W", "G Y", "F R", "F L", "F Y", "V R", "V Y", "TH R", "TH W", "TH Y", "SH R", "SH W", "SH L",
+    "S P", "S T", "S K", "S M", "S N", "S L", "S W", "S F", "S V", "M Y", "N Y", "HH Y", "L Y",
+    "S P R", "S P L", "S P Y", "S T R", "S T Y", "S K R", "S K L", "S K W", "S K Y",
+]
+# Short vowels that keep the consonant after them when stressed: `bet-ter`, not `be-tter`
+lax = ["AE", "EH", "IH", "AA", "AH", "UH"]
+
+# How the spelling picks between ways to write a sound. The first rule that fits wins.
+[[spelled]]
+sound = "UW"
+label = "UW.oo"
+contains = "oo"
+
+[[spelled]]
+sound = "UW"
+label = "UW.ew"
+contains = "ew"
+
+[[spelled]]
+sound = "W"
+label = "W.wh"
+starts = "wh"
+
+[[spelled]]
+sound = "R"
+label = "R.wr"
+starts = "wr"
+
+[[spelled]]
+sound = "Z"
+label = "Z.s"
+ends = "s"
+
+[[spelled]]
+sound = "T"
+label = "T.ed"
+ends = "ed"
+
+[[spelled]]
+sound = "ER"
+label = "ER.ir"
+contains = "ir"
+
+[[spelled]]
+sound = "ER"
+label = "ER.er"
+contains = "er"
+
+# Written with an `o` it is the O vowel; with `aw`, `au` or `all` it stays the AU vowel
+[[spelled]]
+sound = "AO"
+label = "AO"
+contains = "aw"
+
+[[spelled]]
+sound = "AO"
+label = "AO"
+contains = "au"
+
+[[spelled]]
+sound = "AO"
+label = "AO"
+contains = "al"
+
+[[spelled]]
+sound = "AO"
+label = "AO"
+contains = "ough"
+
+[[spelled]]
+sound = "AO"
+label = "AO.o"
+contains = "o"
+
+[[spelled]]
+sound = "UH"
+label = "UH"
+contains = "oo"
+
+[[spelled]]
+sound = "UH"
+label = "UH.u"
+contains = "u"
+
+[[spelled]]
+sound = "IY"
+label = "IY.ea"
+contains = "ea"
+
+[[spelled]]
+sound = "IH"
+label = "IH.ea"
+contains = "ea"
+
+[[spelled]]
+sound = "AA"
+label = "AA.al"
+contains = "al"
+
+[[spelled]]
+sound = "AA"
+label = "AA.a"
+contains = "a"
+
+[[spelled]]
+sound = "AH"
+label = "AH.o"
+contains = "o"
+
+[[spelled]]
+sound = "ER"
+label = "ER.or"
+contains = "wor"
+
+[[spelled]]
+sound = "ER"
+label = "ER.ear"
+contains = "ear"
+
+[[spelled]]
+sound = "NG"
+label = "NG.ing"
+ends = "ing"
+min_syllables = 2
+
+# An unstressed syllable with one of these vowels does not get a vowel: its consonants go on the
+# stroke before it, as in `couple` KUPL, `living` HREUFG, `special` SPERBL.
+[reduce]
+vowels = ["AH", "IH", "ER"]
+
+[theory]
+# Strokes after the first of a word carry a join key, so they can be short and never clash with
+# a word of their own.
+join_key = false
