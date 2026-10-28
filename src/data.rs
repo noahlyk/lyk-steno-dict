@@ -8,7 +8,7 @@ use std::path::Path;
 /// A word's pronunciations, each a list of phones.
 pub type Pronunciations = HashMap<String, Vec<Vec<String>>>;
 
-/// CMUdict: `word PH1 PH2 ...`, with `word(2)` for further pronunciations and `;;;` comments.
+/// `CMUdict`: `word PH1 PH2 ...`, with `word(2)` for further pronunciations and `;;;` comments.
 pub fn load_cmudict(path: &Path) -> Result<Pronunciations> {
     let text = fs::read_to_string(path).with_context(|| path.display().to_string())?;
     let mut words = Pronunciations::new();
@@ -44,7 +44,7 @@ pub fn load_mfa(path: &Path) -> Result<Pronunciations> {
     Ok(words)
 }
 
-/// WikiPron: `word<TAB>phones separated by spaces`.
+/// `WikiPron`: `word<TAB>phones separated by spaces`.
 pub fn load_wikipron(path: &Path) -> Result<Pronunciations> {
     let text = fs::read_to_string(path).with_context(|| path.display().to_string())?;
     let mut words = Pronunciations::new();
