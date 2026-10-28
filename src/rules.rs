@@ -257,6 +257,30 @@ pub struct Rules {
     join_key: bool,
     brevity: Vec<Shortening>,
     prefixes: Vec<(Prefix, Stroke)>,
+    // Read the keys of a stroke the rules did not write, back into the sounds that would have
+    // written them: the tables above, inverted once here instead of on every call.
+    onset_rev: Vec<(Stroke, Vec<String>)>,
+    coda_rev: Vec<(Stroke, Vec<String>)>,
+    vowel_rev: HashMap<Stroke, String>,
+    vowel_coda_rev: Vec<(Stroke, String, String)>,
+}
+
+/// A table inverted: each distinct right-hand side keeps every left-hand side that produced it,
+/// split into its sound tokens (`"P Y"` is `["P", "Y"]`). Sorted by its tokens, so that when two
+/// entries share the exact same keys (`Z` and the glide cluster `Z Y` are both `STKPW`, since
+/// the glide is silent on the keys) the tie always breaks the same way between runs.
+fn invert(table: &HashMap<String, Stroke>) -> Vec<(Stroke, Vec<String>)> {
+    let mut rev: Vec<(Stroke, Vec<String>)> = table
+        .iter()
+        .map(|(sounds, &stroke)| {
+            (
+                stroke,
+                sounds.split_whitespace().map(str::to_owned).collect(),
+            )
+        })
+        .collect();
+    rev.sort_by(|a, b| a.1.cmp(&b.1));
+    rev
 }
 
 fn strokes(table: HashMap<String, String>, what: &str) -> Result<HashMap<String, Stroke>> {
@@ -315,13 +339,46 @@ impl Rules {
         if raw.onset.is_empty() || raw.vowel.is_empty() {
             bail!("the rules need at least [onset] and [vowel]");
         }
+        let onset = strokes(raw.onset, "onset")?;
+        let coda = strokes(raw.coda, "coda")?;
+        let vowel = strokes(raw.vowel, "vowel")?;
+        let vowel_coda = strokes(raw.vowel_coda, "vowel_coda")?;
+        let onset_cluster = strokes(raw.onset_cluster, "onset_cluster")?;
+        let coda_cluster = strokes(raw.coda_cluster, "coda_cluster")?;
+
+        let mut onset_rev = invert(&onset);
+        onset_rev.extend(invert(&onset_cluster));
+        let mut coda_rev = invert(&coda);
+        coda_rev.extend(invert(&coda_cluster));
+        // When two labels share the same vowel keys (`AE` and the spelling variant `AA.a` are
+        // both just `A`), the plain sound wins, deterministically, over a spelling variant
+        let mut vowel_pairs: Vec<(Stroke, String)> =
+            vowel.iter().map(|(s, &k)| (k, s.clone())).collect();
+        vowel_pairs.sort_by(|a, b| {
+            let plain_first = |s: &str| !s.contains('.');
+            (plain_first(&a.1), &a.1).cmp(&(plain_first(&b.1), &b.1))
+        });
+        let vowel_rev: HashMap<Stroke, String> = vowel_pairs.into_iter().collect();
+        let mut vowel_coda_rev: Vec<(Stroke, String, String)> = vowel_coda
+            .iter()
+            .filter_map(|(sounds, &stroke)| {
+                let (vowel, coda) = sounds.split_once(' ')?;
+                Some((stroke, vowel.to_owned(), coda.to_owned()))
+            })
+            .collect();
+        vowel_coda_rev.sort_by(|a, b| (&a.1, &a.2).cmp(&(&b.1, &b.2)));
+
         Ok(Self {
-            onset: strokes(raw.onset, "onset")?,
-            coda: strokes(raw.coda, "coda")?,
-            vowel: strokes(raw.vowel, "vowel")?,
-            vowel_coda: strokes(raw.vowel_coda, "vowel_coda")?,
-            onset_cluster: strokes(raw.onset_cluster, "onset_cluster")?,
-            coda_cluster: strokes(raw.coda_cluster, "coda_cluster")?,
+            onset,
+            coda,
+            vowel,
+            vowel_coda,
+            onset_cluster,
+            coda_cluster,
+            onset_rev,
+            coda_rev,
+            vowel_rev,
+            vowel_coda_rev,
             onsets: raw.syllables.onsets.into_iter().collect(),
             lax: raw.syllables.lax.into_iter().collect(),
             spelled: raw.spelled,
@@ -938,12 +995,177 @@ impl Rules {
             }
         }
     }
+
+    /// Read a stroke's keys back into sounds, the same tables read the other way: a miss in
+    /// the dictionary is not the end, since the rules can still say what it would have meant.
+    /// `None` only when no combination of onset, vowel and coda these rules define fits the
+    /// keys down: a true miss, not a guess.
+    pub fn resolve_stroke(&self, stroke: Stroke) -> Option<Resolved> {
+        let join = stroke.0 & Stroke::JOIN != 0;
+        let bits = stroke.0 & !Stroke::JOIN;
+        let onset = Self::decompose(bits & Stroke::LEFT, &self.onset_rev)?;
+        let vowel_bits = bits & Stroke::VOWELS;
+        let right_all = bits & (Stroke::RIGHT | Stroke::STAR);
+        let (vowel, coda, marker) = self.decode_right(vowel_bits, right_all)?;
+        if onset.is_empty() && vowel.is_none() && coda.is_empty() {
+            return None;
+        }
+        Some(Resolved {
+            onset,
+            vowel,
+            coda,
+            marker,
+            join,
+        })
+    }
+
+    /// The vowel and coda for a stroke's vowel-area and right-hand keys. No vowel is a bare
+    /// continuation or skeleton stroke of consonants only, valid either way. A star left over
+    /// once nothing else claims it is read as the generator's own disambiguation flag (as the
+    /// star ladder uses it), not a sound, and the `bool` says so.
+    fn decode_right(
+        &self,
+        vowel_bits: u32,
+        right_all: u32,
+    ) -> Option<(Option<String>, Vec<String>, bool)> {
+        // Try the star as a sound first (`*T` for TH, `*PBG` for NG K); only drop it, and flag
+        // it as a leftover marker, if nothing fits with it in.
+        for (right, marker) in [(right_all, false), (right_all & !Stroke::STAR, true)] {
+            if marker && right == right_all {
+                continue;
+            }
+            for (combo, vowel, coda) in &self.vowel_coda_rev {
+                let combo_right = combo.0 & Stroke::RIGHT;
+                if combo.0 & Stroke::VOWELS == vowel_bits
+                    && right & combo_right == combo_right
+                    && let Some(mut tail) = Self::decompose(right & !combo_right, &self.coda_rev)
+                {
+                    let mut coda = vec![coda.clone()];
+                    coda.append(&mut tail);
+                    return Some((Some(vowel.clone()), coda, marker));
+                }
+            }
+            if vowel_bits == 0 {
+                if let Some(coda) = Self::decompose(right, &self.coda_rev) {
+                    return Some((None, coda, marker));
+                }
+            } else if let Some(label) = self.vowel_rev.get(&Stroke(vowel_bits))
+                && let Some(coda) = Self::decompose(right, &self.coda_rev)
+            {
+                return Some((Some(label.clone()), coda, marker));
+            }
+        }
+        None
+    }
+
+    /// A run of keys as a sequence of sounds: at the lowest key still down, the entry that
+    /// starts there, covers the most keys, and (tied on that) is the fewest sounds, consumed,
+    /// repeated until none are left. `None` if some key is left with nothing that starts there:
+    /// these keys spell no sound this theory defines.
+    fn decompose(bits: u32, catalog: &[(Stroke, Vec<String>)]) -> Option<Vec<String>> {
+        let mut bits = bits;
+        let mut out = Vec::new();
+        while bits != 0 {
+            let lowest = bits.trailing_zeros();
+            let best = catalog
+                .iter()
+                .filter(|(s, _)| s.0 != 0 && s.0.trailing_zeros() == lowest && bits & s.0 == s.0)
+                .max_by_key(|(s, tokens)| (s.0.count_ones(), std::cmp::Reverse(tokens.len())))?;
+            out.extend(best.1.iter().cloned());
+            bits &= !best.0.0;
+        }
+        Some(out)
+    }
+
+    /// The best reading the rules can give a stroke outline: each stroke's sounds, read back
+    /// and spelled plainly (not real orthography, just enough to read), continuation strokes
+    /// run on and others started with a space. `None` only once some stroke in it cannot be
+    /// read at all.
+    pub fn resolve(&self, outline: &[Stroke]) -> Option<String> {
+        let mut text = String::new();
+        for &stroke in outline {
+            let resolved = self.resolve_stroke(stroke)?;
+            if !resolved.join && !text.is_empty() {
+                text.push(' ');
+            }
+            for sound in resolved
+                .onset
+                .iter()
+                .chain(resolved.vowel.iter())
+                .chain(resolved.coda.iter())
+            {
+                text.push_str(default_spelling(sound));
+            }
+            if resolved.marker {
+                text.push('*');
+            }
+        }
+        Some(text)
+    }
+}
+
+/// What a stroke's keys spell out, read back through the tables that write them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Resolved {
+    pub onset: Vec<String>,
+    pub vowel: Option<String>,
+    pub coda: Vec<String>,
+    /// A star down that no coda or vowel combination claims: a disambiguation flag, not a sound
+    pub marker: bool,
+    pub join: bool,
+}
+
+/// A plain, readable spelling for a sound: not real orthography (that needs the word's own
+/// spelling, which a stroke alone does not carry), just enough that a resolved reading can be
+/// read at all.
+fn default_spelling(sound: &str) -> &str {
+    match plain(sound) {
+        "P" => "p",
+        "B" => "b",
+        "T" => "t",
+        "D" => "d",
+        "K" => "k",
+        "G" => "g",
+        "M" => "m",
+        "N" => "n",
+        "NG" => "ng",
+        "F" => "f",
+        "V" => "v",
+        "TH" => "th",
+        "DH" => "dh",
+        "S" => "s",
+        "Z" => "z",
+        "SH" => "sh",
+        "ZH" => "zh",
+        "CH" => "ch",
+        "JH" => "j",
+        "HH" => "h",
+        "L" => "l",
+        "R" => "r",
+        "W" => "w",
+        "Y" => "y",
+        "IY" => "ee",
+        "IH" => "ih",
+        "EY" => "ay",
+        "EH" => "eh",
+        "AE" => "a",
+        "AA" => "ah",
+        "AH" | "UH" => "uh",
+        "AO" => "aw",
+        "OW" => "oh",
+        "UW" => "oo",
+        "AY" => "eye",
+        "AW" => "ow",
+        "OY" => "oy",
+        "ER" => "er",
+        other => other,
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::stroke::render_outline;
+    use crate::stroke::{parse_outline, render_outline};
 
     fn sounds(text: &str) -> Vec<String> {
         text.split_whitespace().map(str::to_owned).collect()
@@ -1025,6 +1247,34 @@ mod tests {
     fn a_stressed_short_vowel_keeps_a_consonant() {
         assert_eq!(write("every", "EH1 V R IY0"), "EF/REU");
         assert_eq!(write("better", "B EH1 T ER0"), "PWERT");
+    }
+
+    #[test]
+    fn a_miss_is_read_back_into_sounds() {
+        let rules = Rules::built_in().unwrap();
+        let read = |text: &str| rules.resolve(&parse_outline(text).unwrap());
+        // A plain stroke that spells no word the rules know, read back the same way the rules
+        // would have written it: onset, vowel, coda
+        assert_eq!(read("STKPW"), Some("z".to_owned()));
+        // Two labels can share the exact same keys (a plain sound and a spelling variant, or a
+        // sound and its silent-glide cluster); the read-back always picks the same one
+        for _ in 0..5 {
+            assert_eq!(read("A/^A"), Some("aa".to_owned()));
+        }
+    }
+
+    #[test]
+    fn only_a_truly_empty_stroke_is_a_true_miss() {
+        let rules = Rules::built_in().unwrap();
+        // Every key this theory uses means something alone or in some combination; what has no
+        // reading at all is a stroke with nothing left once the star and join bits are set
+        // aside: no onset, no vowel, no coda.
+        assert_eq!(rules.resolve_stroke(Stroke(Stroke::STAR)), None);
+        assert_eq!(rules.resolve_stroke(Stroke(Stroke::JOIN)), None);
+        assert_eq!(
+            rules.resolve_stroke(Stroke(Stroke::STAR | Stroke::JOIN)),
+            None
+        );
     }
 
     #[test]

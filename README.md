@@ -113,6 +113,29 @@ star form because another word sounds the same and has the plain outline (`site`
 `don` and `done`); `build` lists the commonest. 93 of the 30,000 words can't be written by these
 rules yet, nearly all names and interjections (`hm`, `schmidt`, `vlad`).
 
+## A miss always resolves
+
+The tables that write a word (rule 2) also read the other way: `Rules::resolve` takes a stroke
+that missed the dictionary and reads its keys back into sounds, the same way they would have
+been written, spelled plainly rather than in real orthography (there is no word to say how it is
+actually spelled). Every key on this keyboard means something alone, under this theory's own
+tables, and its vowel table covers all 15 non-empty combinations of the vowel keys, so almost
+every stroke reads back as something. A true miss, where the rules give up outright, is only a
+stroke with nothing left once the star and join keys are set aside: no onset, no vowel, no coda,
+because the star and join alone carry no sound.
+
+Two different sounds can use the exact same keys (`Z` and its silent-glide cluster `Z Y` are both
+`STKPW`; a plain vowel and a spelling variant can be the same keys too), which the rules cannot
+tell apart from the stroke alone. The read-back always resolves the tie the same way, so the
+same miss reads the same way every time.
+
+A dictionary built from these rules can give a real steno engine this as its last resort: look
+up the stroke in the dictionary first, and only once that misses, run it through `resolve` for a
+reading instead of a raw echo of the keys. In Plover, that is not a dictionary of entries but a
+small dictionary *plugin*: a `StenoDictionary` whose `lookup` runs this same read-back in code,
+loaded at the bottom of the dictionary stack so it only ever answers once every real entry has
+already missed.
+
 ## Use
 
 ```
@@ -125,6 +148,7 @@ cargo run --release -- mismatches --syllables 2 --after 500    # where the rules
 cargo run --release -- learn               # which keys Plover and Lapwing use for each sound group
 cargo run --release -- build --against magnum.rtf   # add a third dictionary to the cost tables
 cargo run --release -- quote                        # a random quote, stroked lyk next to Plover and Lapwing
+cargo run --release -- resolve STKPW                # a stroke not in the dictionary, read back
 ```
 
 `--rules FILE` and `--briefs FILE` use your own rules and briefs. `learn` is how most rules were

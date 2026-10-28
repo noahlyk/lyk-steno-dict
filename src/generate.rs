@@ -392,6 +392,15 @@ pub fn cheapest(generated: &Generated) -> HashMap<&str, &[Stroke]> {
     best
 }
 
+/// Every outline in a generated dictionary, by its rendered text, to the word it writes.
+pub fn index(generated: &Generated) -> HashMap<String, &str> {
+    generated
+        .entries
+        .iter()
+        .map(|e| (render_outline(&e.outline), e.word.as_str()))
+        .collect()
+}
+
 /// The dictionary as Plover JSON.
 pub fn write_json(generated: &Generated, path: &Path) -> Result<()> {
     let mut map: BTreeMap<String, &str> = BTreeMap::new();

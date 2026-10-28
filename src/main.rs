@@ -12,7 +12,7 @@ mod quote;
 mod rules;
 mod stroke;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
@@ -92,6 +92,19 @@ enum Command {
         #[arg(long, default_value_t = 20)]
         words: usize,
     },
+    /// Read a stroke outline back into sounds, as the engine's last resort when it misses the
+    /// dictionary: the word if it's one the dictionary writes, otherwise the rules' best
+    /// phonetic reading of the keys, or a true miss if no reading fits them at all
+    Resolve {
+        /// A stroke outline, such as `KAT` or `TPAEU/^HR`
+        outline: String,
+        /// Words to cover when building the dictionary, most common first
+        #[arg(long, default_value_t = 30_000)]
+        common: usize,
+        /// Briefs to use instead of the built-in ones
+        #[arg(long)]
+        briefs: Option<PathBuf>,
+    },
 }
 
 fn main() -> Result<()> {
@@ -142,6 +155,30 @@ fn main() -> Result<()> {
                 None => generate::Briefs::built_in()?,
             };
             quote::run(&setup, &briefs, *common, *words)
+        }
+        Command::Resolve {
+            outline,
+            common,
+            briefs,
+        } => {
+            let setup = setup()?;
+            let briefs = match briefs {
+                Some(path) => generate::Briefs::load(path)?,
+                None => generate::Briefs::built_in()?,
+            };
+            let strokes = stroke::parse_outline(outline)
+                .with_context(|| format!("{outline:?} is not a stroke outline"))?;
+            let text = stroke::render_outline(&strokes);
+            let generated = generate::generate(&setup, &briefs, *common)?;
+            let index = generate::index(&generated);
+            if let Some(word) = index.get(&text) {
+                println!("{text}  ->  {word}  (in the dictionary)");
+            } else if let Some(reading) = setup.rules.resolve(&strokes) {
+                println!("{text}  ->  {reading}  (not in the dictionary; the rules' best reading)");
+            } else {
+                println!("{text}  ->  no reading the rules allow: a true miss");
+            }
+            Ok(())
         }
     }
 }
