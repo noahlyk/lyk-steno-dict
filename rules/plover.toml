@@ -30,6 +30,7 @@ W = "W"
 Y = "KWR"
 "W.wh" = "WH"
 "R.wr" = "WR"
+"S.sc" = "SK"
 
 # Consonants at the end of a syllable (right hand)
 [coda]
@@ -54,9 +55,11 @@ CH = "-FP"
 JH = "-PBLG"
 L = "-L"
 R = "-R"
-"Z.s" = "-S"
 "NG.ing" = "-G"
 "T.ed" = "-D"
+# After a vowel with its own `R` (`serve`, `march`): the cluster shares the `R` key
+"V.rv" = "-FRB"
+"CH.rch" = "-FRPB"
 
 # Vowels. A name with a stress digit (`AH0`) is only used for that stress.
 [vowel]
@@ -76,7 +79,6 @@ AW = "OU"
 OY = "OEU"
 ER = "UR"
 "UW.oo" = "AO"
-"UW.ew" = "U"
 "ER.er" = "ER"
 "ER.ir" = "EUR"
 "AO.o" = "O"
@@ -88,6 +90,15 @@ ER = "UR"
 "ER.or" = "OR"
 "ER.ear" = "ER"
 "UH.u" = "U"
+"UH.o" = "O"
+"AH.a" = "A"
+"AA.aw" = "AU"
+"AO.a" = "AU"
+"IH.e" = "E"
+"IY.e" = "E"
+"IY.y" = "EU"
+"OW.oa" = "AO"
+"OW.ed" = "OE"
 
 # A vowel and the consonant after it that go on the keys together: `AA R` is the A and -R of `car`.
 [vowel_coda]
@@ -101,8 +112,13 @@ ER = "UR"
 "UH R" = "AOUR"
 "UW R" = "AOUR"
 "AO NG" = "OPBG"
+"AO.a R" = "AR"
+# Words that sound the same told apart by their spelling: `dear` AER and `deer` AOER, `stair`
+# AEUR and `stare` AER
 "IY.ea R" = "AER"
 "IH.ea R" = "AER"
+"EH.alt R" = "AER"
+"EH.er R" = "ER"
 
 # A run of consonants at the start of a syllable that is not just the keys one after the other
 [onset_cluster]
@@ -122,6 +138,8 @@ ER = "UR"
 "TH Y" = "TH"
 "S Y" = "S"
 "Z Y" = "STKPW"
+# The W of `language`, `penguin` is in the G already
+"G W" = "TKPW"
 
 # A run of consonants at the end of a syllable that is not just the keys one after the other.
 # Plover folds some of these onto a star.
@@ -132,13 +150,27 @@ ER = "UR"
 "S K" = "-FBG"
 "S P" = "-FP"
 "N CH" = "-FRPB"
-"Z D" = "-DZ"
+"Z D" = "-FD"
+"DH Z" = "*TS"
+"TH Z" = "*TS"
 "N JH" = "-PBLG"
 "L F" = "-FL"
 "L V" = "-FL"
 "K S T" = "-BGT"
-"D Z.s" = "-DZ"
+"K S TH" = "*BGTS"
+"D Z" = "-DZ"
 "S T.ed" = "-FD"
+"K S T.ed" = "-BGSD"
+"N S T.ed" = "-PBSD"
+"P S T.ed" = "-PSD"
+"N S T" = "-PBS"
+"NG S T" = "-PBGS"
+# `L` before a consonant that comes before it on the keys: the `L` is in the `-PL` of `film`, and
+# dropped in `help`; `silk` and `bulb` take the keys the other way about
+"L P" = "-P"
+"L M" = "-PL"
+"L K" = "-LG"
+"L B" = "-BL"
 "SH.tion N" = "-GS"
 
 # Runs of consonants English allows at the start of a syllable. Used to decide where a syllable
@@ -162,11 +194,6 @@ label = "UW.oo"
 contains = "oo"
 
 [[spelled]]
-sound = "UW"
-label = "UW.ew"
-contains = "ew"
-
-[[spelled]]
 sound = "W"
 label = "W.wh"
 starts = "wh"
@@ -176,10 +203,31 @@ sound = "R"
 label = "R.wr"
 starts = "wr"
 
+# `scene`, `science`: a soft c is still written as K
 [[spelled]]
-sound = "Z"
-label = "Z.s"
-ends = "s"
+sound = "S"
+label = "S.sc"
+starts = "sce"
+
+[[spelled]]
+sound = "S"
+label = "S.sc"
+starts = "sci"
+
+[[spelled]]
+sound = "S"
+label = "S.sc"
+starts = "scy"
+
+[[spelled]]
+sound = "V"
+label = "V.rv"
+after = "R"
+
+[[spelled]]
+sound = "CH"
+label = "CH.rch"
+after = "R"
 
 [[spelled]]
 sound = "T"
@@ -195,6 +243,17 @@ contains = "ir"
 sound = "ER"
 label = "ER.er"
 contains = "er"
+
+# `war`, `warm`, `quarter`: the vowel before the R is written with its `a`
+[[spelled]]
+sound = "AO"
+label = "AO.a"
+contains = "war"
+
+[[spelled]]
+sound = "AO"
+label = "AO.a"
+contains = "quar"
 
 # Written with an `o` it is the O vowel; with `aw`, `au` or `all` it stays the AU vowel
 [[spelled]]
@@ -233,6 +292,32 @@ label = "UH.u"
 contains = "u"
 
 [[spelled]]
+sound = "UH"
+label = "UH.o"
+contains = "o"
+
+# `-ly` at the end of a word of two or more syllables is not a syllable of its own: its L goes on
+# the stroke before (`nearly` TPHAOERL, `lately` HRAEULT). Any other final `y`, `ey` or `ie` is
+# the short vowel: `pity` PEUT/EU, `money` PHOPB/EU.
+[[spelled]]
+sound = "IY"
+label = "IY.ly"
+ends = "ly"
+min_syllables = 2
+
+[[spelled]]
+sound = "IY"
+label = "IY.y"
+ends = "y"
+min_syllables = 2
+
+[[spelled]]
+sound = "IY"
+label = "IY.y"
+ends = "ie"
+min_syllables = 2
+
+[[spelled]]
 sound = "IY"
 label = "IY.ea"
 contains = "ea"
@@ -242,6 +327,84 @@ clash = true
 sound = "IH"
 label = "IH.ea"
 contains = "ea"
+clash = true
+
+# A reduced first syllable takes the vowel it is spelled with: `believe` PWE/HRAOEF, `about`
+# A/PWOUT, `until` UPB/TEUL
+[[spelled]]
+sound = "IH"
+label = "IH.e"
+prefix = "be"
+
+[[spelled]]
+sound = "IH"
+label = "IH.e"
+prefix = "de"
+
+[[spelled]]
+sound = "IH"
+label = "IH.e"
+prefix = "re"
+
+[[spelled]]
+sound = "IH"
+label = "IH.e"
+prefix = "pre"
+
+[[spelled]]
+sound = "IH"
+label = "IH.e"
+prefix = "se"
+
+[[spelled]]
+sound = "IH"
+label = "IH.e"
+prefix = "e"
+
+[[spelled]]
+sound = "IY"
+label = "IY.e"
+prefix = "re"
+
+[[spelled]]
+sound = "IY"
+label = "IY.e"
+prefix = "pre"
+
+[[spelled]]
+sound = "IY"
+label = "IY.e"
+prefix = "de"
+
+[[spelled]]
+sound = "IY"
+label = "IY.e"
+prefix = "be"
+
+[[spelled]]
+sound = "IY"
+label = "IY.e"
+prefix = "se"
+
+[[spelled]]
+sound = "AH"
+label = "AH.a"
+prefix = "a"
+
+[[spelled]]
+sound = "AH"
+label = "AH"
+prefix = "u"
+
+[[spelled]]
+sound = "AA"
+label = "AA.aw"
+contains = "aw"
+
+[[spelled]]
+sound = "AA"
+label = "AA.aw"
+contains = "au"
 
 [[spelled]]
 sound = "AA"
@@ -252,6 +415,12 @@ contains = "al"
 sound = "AA"
 label = "AA.a"
 contains = "a"
+
+# `rough`, `touch`, `young`: spelled `ou` it is the plain U; spelled `o` (`love`, `son`) it is O
+[[spelled]]
+sound = "AH"
+label = "AH"
+contains = "ou"
 
 [[spelled]]
 sound = "AH"
@@ -290,21 +459,98 @@ contains = "sion"
 min_syllables = 2
 
 # Words that sound the same are told apart by their spelling. `sail` (`ai`) keeps the full vowel;
-# `sale`, with a silent e and no `ai`, `ay`, `ei` or `ey`, moves to the short one.
+# `sale`, with a silent e and no `ai` or `ay`, moves to the short one; so do `weight` and `they`.
 [[spelled]]
 sound = "EY"
 label = "EY.alt"
-unless = ["ai", "ay", "ei", "ey"]
+unless = ["ai", "ay"]
 clash = true
 
+# `very`, `jerry`, `sheriff`, `america`: `er` before another vowel is ER, not the AEUR of `air`
+[[spelled]]
+sound = "EH"
+label = "EH.er"
+contains = "er"
+unless = ["ere", "ear", "eir"]
+
+# `stair` keeps AEUR; `stare` moves to AER
+[[spelled]]
+sound = "EH"
+label = "EH.alt"
+unless = ["ai", "ay"]
+clash = true
+
+# `-owed` and `-ows`: the ending folds, `followed` TPOLD
+[[spelled]]
+sound = "OW"
+label = "OW.ed"
+ends = "owed"
+min_syllables = 2
+
+[[spelled]]
+sound = "OW"
+label = "OW.ed"
+ends = "ows"
+min_syllables = 2
+
+# `load` and `loan` move to AO when `lode` and `lone` are in the way
+[[spelled]]
+sound = "OW"
+label = "OW.oa"
+contains = "oa"
+clash = true
+
+# A prefix with keys of its own, in front of the first stroke of the rest: `expect` KPEBGT
+[[prefix]]
+spelling = "ex"
+sounds = ["IH0 K S", "EH0 K S", "IH0 G Z", "EH0 G Z", "EH1 K S", "EH2 K S", "EH1 G Z", "IH1 K S", "IH1 G Z"]
+keys = "KP"
+
+[[prefix]]
+spelling = "dis"
+sounds = ["D IH0 S", "D IH1 S", "D IH2 S"]
+keys = "STK"
+
 [reduce]
-vowels = ["AH", "IH", "ER"]
+vowels = ["AH", "IH", "ER", "IY.ly", "OW.ed"]
+# Whether the consonants joining the stroke before may land out of steno order (`any`: `lately`
+# HRAEULT) or only in order (`strict`), with a continuation stroke otherwise
+order = "strict"
 
 [theory]
-# Strokes after the first of a word carry a join key, so they can be short and never clash with
-# a word of their own.
-join_key = false
+# lyk is steno with explicit word boundaries: every stroke after the first of a word carries the
+# join key (`^`). A stroke without it always starts a word, so continuation strokes can be short
+# and overlap with words without ever being taken for one.
+join_key = true
 
-# The commonest long words may be a single stroke of their consonants (the fewest keys). Words
-# less common than this rank are written syllable by syllable.
-skeleton_rank = 8000
+# How short a long word may be written, from the shortest form tried first. Each step is a
+# transformation of the full outline that can be done by hand; `rank` is how common a word has
+# to be (its place in the frequency list) to take it, and `vowel` whether the stressed vowel
+# stays. Words that take no step are written a stroke per syllable. Leave this empty for a
+# Lapwing-like dictionary; give every step a huge rank for the shortest one the rules allow.
+[[brevity]]
+step = "skeleton"   # one stroke: the first consonants, then every consonant after the first vowel
+rank = 8000
+vowel = false
+
+[[brevity]]
+step = "skeleton"
+rank = 8000
+
+[[brevity]]
+step = "shell"      # one stroke: the first consonants and those of the stressed and last syllables
+rank = 8000
+vowel = false
+
+[[brevity]]
+step = "shell"
+rank = 8000
+
+[[brevity]]
+step = "ends"       # one stroke: the first consonants and those of the last syllable
+rank = 8000
+vowel = false
+
+[[brevity]]
+step = "ends"
+rank = 8000

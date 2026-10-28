@@ -2,6 +2,7 @@
 //! order so the result is predictable.
 
 use crate::analysis::Setup;
+use crate::rules::Step;
 use crate::stroke::{Stroke, parse_outline, render_outline};
 use anyhow::{Context, Result};
 use serde::Deserialize;
@@ -41,8 +42,8 @@ impl Briefs {
 pub enum Origin {
     Brief,
     Rules,
-    /// A long word written as one stroke of its consonants
-    Skeleton,
+    /// A long word written shorter by one of the shortening steps
+    Short(Step),
     /// The spelling told it from a word that sounds the same
     Spelling,
     /// Another pronunciation of a word
@@ -225,12 +226,13 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
     let mut spelled: HashSet<String> = HashSet::new();
     for members in groups.values().filter(|m| m.len() > 1) {
         for word in members {
-            let Some(outline) = setup.pron[*word]
+            let Some(mut outline) = setup.pron[*word]
                 .iter()
                 .find_map(|sounds| setup.rules.variant(word, sounds))
             else {
                 continue;
             };
+            setup.rules.joined(&mut outline);
             let text = render_outline(&outline);
             if taken.contains_key(&text) || wanted.contains_key(&text) {
                 continue;
@@ -263,40 +265,40 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
         };
         let mut placed = false;
         let mut lost_to: Option<String> = None;
-        // The commonest long words go first for the fewest keys: a single skeleton stroke
-        let mut options: Vec<(u8, Vec<Stroke>)> = Vec::new();
-        if setup.rank[word.as_str()] < setup.rules.skeleton_rank() {
+        // The commonest long words go first for the fewest keys: the shortening steps, in order
+        let mut options: Vec<(Origin, Vec<Stroke>)> = Vec::new();
+        let own = setup.rank[word.as_str()];
+        for short in setup.rules.brevity().iter().filter(|s| own < s.rank) {
             for sounds in &setup.pron[word.as_str()] {
-                for stroke in setup.rules.skeletons(word, sounds) {
+                for stroke in setup.rules.shorten(*short, word, sounds) {
                     // Not an outline a word at least as common would have by the rules
                     let theirs = wanted.get(&render_outline(&[stroke])).copied();
-                    let own = setup.rank[word.as_str()];
                     if !simple.contains(&render_outline(&[stroke]))
                         && theirs.is_none_or(|rank| rank > own)
                         && !options.iter().any(|(_, o)| o == &vec![stroke])
                     {
-                        options.push((9, vec![stroke]));
+                        options.push((Origin::Short(short.step), vec![stroke]));
                     }
                 }
             }
         }
-        options.push((0, first.clone()));
-        options.extend(ladder(first, join));
-        for (step, outline) in options {
+        options.push((Origin::Rules, first.clone()));
+        options.extend(
+            ladder(first, join)
+                .into_iter()
+                .map(|(n, o)| (Origin::Ladder(n), o)),
+        );
+        for (origin, mut outline) in options {
+            setup.rules.joined(&mut outline);
             let text = render_outline(&outline);
             if let Some(holder) = taken.get(&text) {
                 lost_to.get_or_insert_with(|| holder.clone());
             } else {
                 taken.insert(text, (*word).clone());
-                let origin = match step {
-                    0 => Origin::Rules,
-                    9 => Origin::Skeleton,
-                    n => Origin::Ladder(n),
-                };
-                let lost_to = if step == 0 || step == 9 {
-                    None
-                } else {
+                let lost_to = if matches!(origin, Origin::Ladder(_)) {
                     lost_to.clone()
+                } else {
+                    None
                 };
                 entries.push(Entry {
                     word: (*word).clone(),
@@ -313,12 +315,14 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
         }
         // Other pronunciations are only added where they clash with nothing
         for outline in others {
-            let text = render_outline(outline);
+            let mut outline = outline.clone();
+            setup.rules.joined(&mut outline);
+            let text = render_outline(&outline);
             if !taken.contains_key(&text) {
                 taken.insert(text, (*word).clone());
                 entries.push(Entry {
                     word: (*word).clone(),
-                    outline: outline.clone(),
+                    outline,
                     origin: Origin::Alternate,
                     lost_to: None,
                 });

@@ -40,11 +40,18 @@ impl Setup {
         })
     }
 
-    /// Every outline the rules give a word, one per pronunciation that can be written.
+    /// Every outline the rules give a word, one per pronunciation that can be written, and the
+    /// form its spelling gives it when it clashes with a word that sounds the same.
     pub fn candidates(&self, word: &str) -> Vec<String> {
         let mut found: Vec<String> = Vec::new();
         for sounds in self.pron.get(word).into_iter().flatten() {
-            if let Some(outline) = self.rules.outline(word, sounds) {
+            for outline in [
+                self.rules.outline(word, sounds),
+                self.rules.variant(word, sounds),
+            ]
+            .into_iter()
+            .flatten()
+            {
                 let text = render_outline(&outline);
                 if !found.contains(&text) {
                     found.push(text);

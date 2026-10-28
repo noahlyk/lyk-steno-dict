@@ -47,11 +47,14 @@ impl Gold {
             .collect()
     }
 
-    /// Whether Plover and Lapwing write `word` as `outline`.
+    /// Whether Plover and Lapwing write the word with this outline, comparing shapes: the join
+    /// key, and the `KWR` or star that Lapwing and Plover put on a continuation stroke to mark it
+    /// as one, are not counted.
     pub fn writes(&self, word: &str, outline: &str) -> (bool, bool) {
+        let wanted = shape(outline);
         let has = |map: &HashMap<String, Vec<String>>| {
             map.get(word)
-                .is_some_and(|all| all.iter().any(|o| o == outline))
+                .is_some_and(|all| all.iter().any(|o| shape(o) == wanted))
         };
         (has(&self.plover), has(&self.lapwing))
     }
@@ -68,4 +71,25 @@ impl Gold {
                 .map(String::as_str),
         )
     }
+}
+
+/// An outline with the markers of a continuation stroke taken off: `^`, a leading `KWR` before a
+/// vowel, and a star.
+fn shape(outline: &str) -> String {
+    outline
+        .split('/')
+        .enumerate()
+        .map(|(n, stroke)| {
+            if n == 0 {
+                return stroke.to_owned();
+            }
+            let stroke = stroke.strip_prefix('^').unwrap_or(stroke);
+            let stroke = match stroke.strip_prefix("KWR") {
+                Some(rest) if rest.starts_with(['A', 'O', 'E', 'U', '*']) => rest,
+                _ => stroke,
+            };
+            stroke.replace('*', "")
+        })
+        .collect::<Vec<_>>()
+        .join("/")
 }
