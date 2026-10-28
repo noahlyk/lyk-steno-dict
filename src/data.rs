@@ -137,11 +137,7 @@ pub fn report(root: &Path) -> Result<()> {
 
     let dicts = root.join("dictionaries");
     let plover = word_outlines(&load_dictionary(&dicts.join("plover-main.json"))?);
-    let mut lapwing_dict = BTreeMap::new();
-    for name in ["lapwing-base"] {
-        lapwing_dict.extend(load_dictionary(&dicts.join(format!("{name}.json")))?);
-    }
-    let lapwing = word_outlines(&lapwing_dict);
+    let lapwing = word_outlines(&load_dictionary(&dicts.join("lapwing-base.json"))?);
     println!("\ndictionaries (plain words only, one shortest outline each)");
     println!("  plover  {:>7} words", plover.len());
     println!("  lapwing {:>7} words", lapwing.len());
