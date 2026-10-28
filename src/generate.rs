@@ -66,7 +66,7 @@ pub struct Generated {
 }
 
 /// The shortest outline (fewest strokes, then fewest keys) from a list.
-fn shortest(outlines: &[String]) -> Option<Vec<Stroke>> {
+pub fn shortest(outlines: &[String]) -> Option<Vec<Stroke>> {
     outlines
         .iter()
         .filter_map(|o| parse_outline(o))
@@ -76,7 +76,7 @@ fn shortest(outlines: &[String]) -> Option<Vec<Stroke>> {
 /// The shortest outline a dictionary has for a word that the other dictionary has too, failing
 /// that its shortest at all. Plover's `main.json` is full of misstrokes (`O` for *to*, `SP` for
 /// *and*); an outline both have is one people really write.
-fn known(own: Option<&Vec<String>>, other: Option<&Vec<String>>) -> Option<Vec<Stroke>> {
+pub fn known(own: Option<&Vec<String>>, other: Option<&Vec<String>>) -> Option<Vec<Stroke>> {
     let own = own?;
     let shared: Vec<String> = other
         .map(|o| own.iter().filter(|x| o.contains(x)).cloned().collect())
@@ -375,6 +375,21 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
         entries,
         unresolved,
     })
+}
+
+/// Each word's cheapest outline (fewest strokes, then fewest keys) from a generated dictionary.
+pub fn cheapest(generated: &Generated) -> HashMap<&str, &[Stroke]> {
+    let mut best: HashMap<&str, &[Stroke]> = HashMap::new();
+    for entry in &generated.entries {
+        let cost = |o: &[Stroke]| (o.len(), keys(o));
+        match best.get(entry.word.as_str()) {
+            Some(current) if cost(current) <= cost(&entry.outline) => {}
+            _ => {
+                best.insert(&entry.word, &entry.outline);
+            }
+        }
+    }
+    best
 }
 
 /// The dictionary as Plover JSON.

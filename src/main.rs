@@ -8,6 +8,7 @@ mod data;
 mod fetch;
 mod generate;
 mod gold;
+mod quote;
 mod rules;
 mod stroke;
 
@@ -79,6 +80,18 @@ enum Command {
         #[arg(long)]
         against: Option<PathBuf>,
     },
+    /// Grab a random quote off the web and stroke it out, lyk next to Plover and Lapwing
+    Quote {
+        /// Words to cover when building the dictionary, most common first
+        #[arg(long, default_value_t = 30_000)]
+        common: usize,
+        /// Briefs to use instead of the built-in ones
+        #[arg(long)]
+        briefs: Option<PathBuf>,
+        /// Try for a quote with at most this many words
+        #[arg(long, default_value_t = 20)]
+        words: usize,
+    },
 }
 
 fn main() -> Result<()> {
@@ -117,6 +130,18 @@ fn main() -> Result<()> {
                 None => None,
             };
             generate::build(&setup, &briefs, *common, out, against.as_ref())
+        }
+        Command::Quote {
+            common,
+            briefs,
+            words,
+        } => {
+            let setup = setup()?;
+            let briefs = match briefs {
+                Some(path) => generate::Briefs::load(path)?,
+                None => generate::Briefs::built_in()?,
+            };
+            quote::run(&setup, &briefs, *common, *words)
         }
     }
 }

@@ -124,6 +124,7 @@ cargo run --release -- explain moon        # which rules wrote a word, next to P
 cargo run --release -- mismatches --syllables 2 --after 500    # where the rules differ
 cargo run --release -- learn               # which keys Plover and Lapwing use for each sound group
 cargo run --release -- build --against magnum.rtf   # add a third dictionary to the cost tables
+cargo run --release -- quote                        # a random quote, stroked lyk next to Plover and Lapwing
 ```
 
 `--rules FILE` and `--briefs FILE` use your own rules and briefs. `learn` is how most rules were
