@@ -86,12 +86,18 @@ pub fn run(setup: &Setup, briefs: &Briefs, common: usize, max_words: usize) -> R
         .split_whitespace()
         .filter_map(clean)
         .map(|word| {
-            let plover =
-                generate::known(setup.gold.plover.get(&word), setup.gold.lapwing.get(&word))
-                    .map_or_else(|| "-".to_owned(), |o| render_outline(&o));
-            let lapwing =
-                generate::known(setup.gold.lapwing.get(&word), setup.gold.plover.get(&word))
-                    .map_or_else(|| "-".to_owned(), |o| render_outline(&o));
+            let plover = setup
+                .gold
+                .plover
+                .get(&word)
+                .and_then(|o| generate::shortest(o))
+                .map_or_else(|| "-".to_owned(), |o| render_outline(&o));
+            let lapwing = setup
+                .gold
+                .lapwing
+                .get(&word)
+                .and_then(|o| generate::shortest(o))
+                .map_or_else(|| "-".to_owned(), |o| render_outline(&o));
             let ours = outline_of(setup, &lyk, &word);
             (word, ours, plover, lapwing)
         })
