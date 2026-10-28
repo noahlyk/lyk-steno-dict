@@ -304,6 +304,13 @@ sound = "UH"
 label = "UH"
 contains = "oo"
 
+# `jury`, `during`, `curious`: `ur` before another vowel is UR; `sure`, `pure` keep AOUR
+[[spelled]]
+sound = "UH"
+label = "UH.ur"
+contains = "ur"
+unless = ["ure"]
+
 [[spelled]]
 sound = "UH"
 label = "UH.u"
@@ -338,7 +345,8 @@ min_syllables = 2
 [[spelled]]
 sound = "IY"
 label = "IY.y"
-ends = "ies"
+contains = "ies"
+before = "Z"
 min_syllables = 2
 
 # A final `a` is its own stroke: `china` KHAOEUPB/A
@@ -348,12 +356,6 @@ label = "AH.a"
 ends = "a"
 min_syllables = 2
 
-# `jury`, `during`, `curious`: `ur` before another vowel is UR; `sure`, `pure` keep AOUR
-[[spelled]]
-sound = "UH"
-label = "UH.ur"
-contains = "ur"
-unless = ["ure"]
 
 [[spelled]]
 sound = "IY"
@@ -561,6 +563,7 @@ join_key = true
 step = "skeleton"   # one stroke: the first consonants, then every consonant after the first vowel
 rank = 8000
 vowel = false
+min_syllables = 3   # with no vowel at all, only for long words
 
 [[brevity]]
 step = "skeleton"
@@ -570,6 +573,7 @@ rank = 8000
 step = "shell"      # one stroke: the first consonants and those of the stressed and last syllables
 rank = 8000
 vowel = false
+min_syllables = 3
 
 [[brevity]]
 step = "shell"
@@ -579,6 +583,7 @@ rank = 8000
 step = "ends"       # one stroke: the first consonants and those of the last syllable
 rank = 8000
 vowel = false
+min_syllables = 3
 
 [[brevity]]
 step = "ends"

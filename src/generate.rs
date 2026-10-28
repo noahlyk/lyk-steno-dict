@@ -214,8 +214,16 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
     // The outlines some word has by the rules
     let wanted: HashSet<&String> = groups.keys().collect();
     let mut spelled: HashSet<String> = HashSet::new();
-    for members in groups.values().filter(|m| m.len() > 1) {
-        for word in members {
+    // Words whose outline another word has too, or a brief has already: the commonest first, so
+    // `heal` gets HAEL before `hale` asks for it
+    let mut clashing: Vec<&str> = groups
+        .iter()
+        .filter(|(text, members)| members.len() > 1 || taken.contains_key(text.as_str()))
+        .flat_map(|(_, members)| members.iter().copied())
+        .collect();
+    clashing.sort_by_key(|w| (setup.rank[*w], *w));
+    {
+        for word in &clashing {
             let Some(mut outline) = setup.pron[*word]
                 .iter()
                 .find_map(|sounds| setup.rules.variant(word, sounds))
@@ -255,10 +263,16 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
         };
         let mut placed = false;
         let mut lost_to: Option<String> = None;
-        // The commonest long words go first for the fewest keys: the shortening steps, in order
+        // The commonest long words go first for the fewest keys: the shortening steps, in order.
+        // Only where they save a stroke; the outline by the rules is added as well below.
         let mut options: Vec<(Origin, Vec<Stroke>)> = Vec::new();
         let own = setup.rank[word.as_str()];
-        for short in setup.rules.brevity().iter().filter(|s| own < s.rank) {
+        for short in setup
+            .rules
+            .brevity()
+            .iter()
+            .filter(|s| own < s.rank && first.len() > 1)
+        {
             for sounds in &setup.pron[word.as_str()] {
                 for stroke in setup.rules.shorten(*short, word, sounds) {
                     // Never an outline some word has by the rules: those stay theirs
@@ -305,6 +319,19 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
         }
         if !placed {
             unresolved.push((*word).clone());
+        }
+        // A word with a short form keeps the outline the rules give it too, when it is free
+        let mut by_rule = first.clone();
+        setup.rules.joined(&mut by_rule);
+        let text = render_outline(&by_rule);
+        if placed && !taken.contains_key(&text) {
+            taken.insert(text, (*word).clone());
+            entries.push(Entry {
+                word: (*word).clone(),
+                outline: by_rule,
+                origin: Origin::Rules,
+                lost_to: None,
+            });
         }
         // Other pronunciations are only added where they clash with nothing
         for outline in others {

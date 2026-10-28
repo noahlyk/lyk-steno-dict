@@ -60,10 +60,17 @@ struct RawBrevity {
     /// Whether the stressed vowel is kept (one-stroke steps)
     #[serde(default = "yes")]
     vowel: bool,
+    /// Only words with at least this many syllables
+    #[serde(default = "two")]
+    min_syllables: usize,
 }
 
 const fn yes() -> bool {
     true
+}
+
+const fn two() -> usize {
+    2
 }
 
 /// A way to write a word of several syllables shorter than a stroke per syllable. Each is a
@@ -101,6 +108,7 @@ pub struct Shortening {
     pub step: Step,
     pub rank: usize,
     pub vowel: bool,
+    pub min_syllables: usize,
 }
 
 #[derive(Deserialize, Default)]
@@ -153,6 +161,8 @@ pub struct Spelled {
     pub prefix: Option<String>,
     /// The sound before this one is this (`R` also matches a vowel with an R in it, `ER`)
     pub after: Option<String>,
+    /// The sound after this one is this, and the last: the `Z` of `babies`
+    pub before: Option<String>,
     /// The word has at least this many syllables
     pub min_syllables: Option<usize>,
     /// The word has none of these in it
@@ -180,6 +190,10 @@ impl Spelled {
                 .after
                 .as_ref()
                 .is_none_or(|s| before.is_some_and(|b| b == s || (s == "R" && b == "ER")))
+            && self
+                .before
+                .as_ref()
+                .is_none_or(|s| at + 2 == count && plain(&sounds[at + 1]) == s)
             && !self.unless.iter().any(|s| word.contains(s.as_str()))
             && self
                 .starts
@@ -305,6 +319,7 @@ impl Rules {
                     step: b.step,
                     rank: b.rank,
                     vowel: b.vowel,
+                    min_syllables: b.min_syllables,
                 })
                 .collect(),
         })
@@ -509,6 +524,13 @@ impl Rules {
 
     /// The one-stroke forms a shortening step gives a word of several syllables.
     pub fn shorten(&self, step: Shortening, word: &str, sounds: &[String]) -> Vec<Stroke> {
+        let syllables = sounds
+            .iter()
+            .filter(|s| s.ends_with(|c: char| c.is_ascii_digit()))
+            .count();
+        if syllables < step.min_syllables {
+            return Vec::new();
+        }
         self.skeletons(word, sounds)
             .into_iter()
             .filter(|(kind, vowel, _)| *kind == step.step && *vowel == step.vowel)
@@ -589,10 +611,15 @@ impl Rules {
 
         let mut found: Vec<(Step, bool, Stroke)> = Vec::new();
         for (step, rest) in choices {
-            let Some(coda) = Self::consonants(&rest, &self.coda, &self.coda_cluster, true) else {
+            // The consonants in steno order, as they are read; a form with no left hand and no
+            // vowel is not offered
+            let Some(coda) = Self::consonants(&rest, &self.coda, &self.coda_cluster, false) else {
                 continue;
             };
             if coda.is_empty() {
+                continue;
+            }
+            if onset.is_empty() {
                 continue;
             }
             let bare = Stroke(onset.0 | coda.0);
@@ -840,11 +867,31 @@ mod tests {
     #[test]
     fn a_long_word_can_be_one_skeleton_stroke() {
         let rules = Rules::built_in().unwrap();
-        let skeletons = rules.skeletons("condition", &sounds("K AH0 N D IH1 SH AH0 N"));
-        // The consonants alone first, then with the stressed vowel
-        assert!(skeletons.len() >= 2, "{skeletons:?}");
-        assert_eq!(skeletons[0].0, Step::Skeleton);
-        assert!(skeletons[0].2.0 & (Stroke::VOWELS | Stroke::STAR) == 0);
-        assert!(skeletons[1].2.0 & Stroke::VOWELS != 0);
+        let forms = |word: &str, text: &str| -> Vec<String> {
+            rules
+                .skeletons(word, &sounds(text))
+                .into_iter()
+                .map(|(step, vowel, stroke)| {
+                    format!("{step}{} {stroke}", if vowel { "+v" } else { "" })
+                })
+                .collect()
+        };
+        // Every consonant after the first vowel in steno order, bare and with the stressed vowel
+        let window = forms("window", "W IH1 N D OW0");
+        assert_eq!(window[..2], ["skeleton W-PBD", "skeleton+v WEUPBD"]);
+        assert!(window.contains(&"ends W-D".to_owned()), "{window:?}");
+        // The L of `-ly` would land before the T, so only the last syllable's form is in order
+        assert_eq!(
+            forms("lately", "L EY1 T L IY0"),
+            ["ends HR-L", "ends+v HRAEUL"]
+        );
+        // Out of order (the D of `-dish` would land after the SH), neither the full skeleton
+        // nor the stressed-and-last form is offered; the last syllable's form is Plover's brief
+        assert_eq!(
+            forms("condition", "K AH0 N D IH1 SH AH0 N"),
+            ["ends K-PB", "ends+v KEUPB"]
+        );
+        // With no left hand there is no short form
+        assert!(forms("america", "AH0 M EH1 R IH0 K AH0").is_empty());
     }
 }
