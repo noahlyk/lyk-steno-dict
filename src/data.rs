@@ -75,7 +75,42 @@ pub fn load_frequency(path: &Path) -> Result<Vec<(String, u64)>> {
 /// A Plover dictionary: outline (strokes joined by `/`) to translation.
 pub fn load_dictionary(path: &Path) -> Result<BTreeMap<String, String>> {
     let text = fs::read_to_string(path).with_context(|| path.display().to_string())?;
+    if path
+        .extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("rtf"))
+    {
+        return Ok(load_rtf(&text));
+    }
     serde_json::from_str(&text).with_context(|| path.display().to_string())
+}
+
+/// An RTF/CRE dictionary (what court reporting software and Magnum ship): each entry is
+/// `{\*\cxs OUTLINE}translation`. Only the plain text of a translation is kept; formatting
+/// control words end it.
+fn load_rtf(text: &str) -> BTreeMap<String, String> {
+    const MARK: &str = "{\\*\\cxs ";
+    let mut dict = BTreeMap::new();
+    let mut rest = text;
+    while let Some(at) = rest.find(MARK) {
+        rest = &rest[at + MARK.len()..];
+        let Some(end) = rest.find('}') else { break };
+        let outline = rest[..end].trim().to_owned();
+        rest = &rest[end + 1..];
+        let stop = rest
+            .find(['{', '}', '\\', '\r', '\n'])
+            .unwrap_or(rest.len());
+        let translation = rest[..stop].trim();
+        if !outline.is_empty() && !translation.is_empty() {
+            dict.entry(outline)
+                .or_insert_with(|| translation.to_owned());
+        }
+    }
+    dict
+}
+
+/// Every plain word a dictionary file (JSON or RTF) writes, with its shortest outline.
+pub fn load_words(path: &Path) -> Result<HashMap<String, String>> {
+    Ok(word_outlines(&load_dictionary(path)?))
 }
 
 /// Is the translation a plain word, with nothing but letters, apostrophes or hyphens?

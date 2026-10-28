@@ -123,6 +123,7 @@ cargo run --release -- build               # briefs + rules -> out/lyk.json, wit
 cargo run --release -- explain moon        # which rules wrote a word, next to Plover and Lapwing
 cargo run --release -- mismatches --syllables 2 --after 500    # where the rules differ
 cargo run --release -- learn               # which keys Plover and Lapwing use for each sound group
+cargo run --release -- build --against magnum.rtf   # add a third dictionary to the cost tables
 ```
 
 `--rules FILE` and `--briefs FILE` use your own rules and briefs. `learn` is how most rules were

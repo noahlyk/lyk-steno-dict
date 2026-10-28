@@ -75,6 +75,9 @@ enum Command {
         /// Briefs to use instead of the built-in ones
         #[arg(long)]
         briefs: Option<PathBuf>,
+        /// Another dictionary (JSON or RTF/CRE, such as Magnum's) to put in the cost tables
+        #[arg(long)]
+        against: Option<PathBuf>,
     },
 }
 
@@ -97,13 +100,23 @@ fn main() -> Result<()> {
             out,
             common,
             briefs,
+            against,
         } => {
             let setup = setup()?;
             let briefs = match briefs {
                 Some(path) => generate::Briefs::load(path)?,
                 None => generate::Briefs::built_in()?,
             };
-            generate::build(&setup, &briefs, *common, out)
+            let against = match against {
+                Some(path) => {
+                    let name = path
+                        .file_stem()
+                        .map_or_else(|| "other".to_owned(), |s| s.to_string_lossy().into_owned());
+                    Some((name, data::load_words(path)?))
+                }
+                None => None,
+            };
+            generate::build(&setup, &briefs, *common, out, against.as_ref())
         }
     }
 }

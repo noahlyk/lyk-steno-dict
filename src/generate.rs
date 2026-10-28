@@ -392,7 +392,13 @@ pub fn write_json(generated: &Generated, path: &Path) -> Result<()> {
 }
 
 /// Build the dictionary, write it, and say what it costs to type next to Plover and Lapwing.
-pub fn build(setup: &Setup, briefs: &Briefs, common: usize, out: &Path) -> Result<()> {
+pub fn build(
+    setup: &Setup,
+    briefs: &Briefs,
+    common: usize,
+    out: &Path,
+    against: Option<&(String, HashMap<String, String>)>,
+) -> Result<()> {
     let generated = generate(setup, briefs, common)?;
     write_json(&generated, out)?;
 
@@ -431,7 +437,12 @@ pub fn build(setup: &Setup, briefs: &Briefs, common: usize, out: &Path) -> Resul
         let outline = known(own, other)?;
         Some((outline.len(), keys(&outline)))
     };
-    let mut total = [0f64; 7];
+    // Another dictionary to compare with, by its own shortest outline for each word
+    let other_cost = |word: &str| -> Option<(usize, u32)> {
+        let outline = parse_outline(against?.1.get(word)?)?;
+        Some((outline.len(), keys(&outline)))
+    };
+    let mut total = [0f64; 9];
     // The same, by how common the word is: where the keys go
     const BANDS: [(usize, &str); 5] = [
         (100, "top 100"),
@@ -440,7 +451,7 @@ pub fn build(setup: &Setup, briefs: &Briefs, common: usize, out: &Path) -> Resul
         (20_000, "5k-20k"),
         (usize::MAX, "20k+"),
     ];
-    let mut bands = [[0f64; 4]; BANDS.len()];
+    let mut bands = [[0f64; 5]; BANDS.len()];
     let mut worse: Vec<(f64, &str, u32, u32)> = Vec::new();
     for (word, &(strokes, key_count)) in &ours {
         let (Some(plover), Some(lapwing)) = (
@@ -449,6 +460,11 @@ pub fn build(setup: &Setup, briefs: &Briefs, common: usize, out: &Path) -> Resul
         ) else {
             continue;
         };
+        let other = other_cost(word);
+        if against.is_some() && other.is_none() {
+            continue;
+        }
+        let other = other.unwrap_or_default();
         let weight = setup.count.get(*word).copied().unwrap_or(0) as f64;
         total[0] += weight;
         total[1] += weight * strokes as f64;
@@ -457,12 +473,15 @@ pub fn build(setup: &Setup, briefs: &Briefs, common: usize, out: &Path) -> Resul
         total[4] += weight * f64::from(plover.1);
         total[5] += weight * lapwing.0 as f64;
         total[6] += weight * f64::from(lapwing.1);
+        total[7] += weight * other.0 as f64;
+        total[8] += weight * f64::from(other.1);
         let rank = setup.rank.get(*word).copied().unwrap_or(usize::MAX);
         let band = BANDS.iter().position(|(to, _)| rank < *to).unwrap_or(0);
         bands[band][0] += weight;
         bands[band][1] += weight * f64::from(key_count);
         bands[band][2] += weight * f64::from(plover.1);
         bands[band][3] += weight * f64::from(lapwing.1);
+        bands[band][4] += weight * f64::from(other.1);
         if key_count > plover.1 {
             worse.push((
                 weight * f64::from(key_count - plover.1),
@@ -472,14 +491,19 @@ pub fn build(setup: &Setup, briefs: &Briefs, common: usize, out: &Path) -> Resul
             ));
         }
     }
+    let other_name = against.map_or("", |(name, _)| name.as_str());
     println!("\nwhat a word costs on average, weighted by how often it is said");
-    println!("(words all three write; strokes and keys pressed per word)");
+    println!("(words all the dictionaries write; strokes and keys pressed per word)");
     println!("            strokes     keys");
-    for (name, strokes, key_count) in [
+    let mut rows = vec![
         ("this", total[1], total[2]),
         ("plover", total[3], total[4]),
         ("lapwing", total[5], total[6]),
-    ] {
+    ];
+    if against.is_some() {
+        rows.push((other_name, total[7], total[8]));
+    }
+    for (name, strokes, key_count) in rows {
         println!(
             "  {name:<9} {:>7.3} {:>8.3}",
             strokes / total[0],
@@ -487,13 +511,18 @@ pub fn build(setup: &Setup, briefs: &Briefs, common: usize, out: &Path) -> Resul
         );
     }
     println!("\nkeys per word by how common the word is, and the share of all words said");
-    println!("            share     this   plover  lapwing");
+    println!("            share     this   plover  lapwing  {other_name}");
     for ((_, name), band) in BANDS.iter().zip(&bands) {
         if band[0] == 0.0 {
             continue;
         }
+        let other = if against.is_some() {
+            format!("  {:>7.3}", band[4] / band[0])
+        } else {
+            String::new()
+        };
         println!(
-            "  {name:<9} {:>5.1}%  {:>7.3}  {:>7.3}  {:>7.3}",
+            "  {name:<9} {:>5.1}%  {:>7.3}  {:>7.3}  {:>7.3}{other}",
             100.0 * band[0] / total[0],
             band[1] / band[0],
             band[2] / band[0],
