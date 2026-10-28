@@ -63,6 +63,9 @@ struct RawBrevity {
     /// Only words with at least this many syllables
     #[serde(default = "two")]
     min_syllables: usize,
+    /// Whether the folded consonants may land out of steno order (`any`) or not (`strict`)
+    #[serde(default)]
+    order: Option<String>,
 }
 
 const fn yes() -> bool {
@@ -91,6 +94,9 @@ pub enum Step {
     /// The consonants of an unstressed first syllable go on the left hand of the next stroke:
     /// `believe` PWHRAOEF.
     Lean,
+    /// The outline with reduced syllables folded out of steno order where they would not fit in
+    /// order, as Plover does: `student` STAOUPBTD, `goodness` TKPWAOPBSD.
+    Fold,
 }
 
 impl std::fmt::Display for Step {
@@ -101,6 +107,7 @@ impl std::fmt::Display for Step {
             Self::Ends => "ends",
             Self::Lead => "lead",
             Self::Lean => "lean",
+            Self::Fold => "fold",
         })
     }
 }
@@ -112,6 +119,7 @@ pub struct Shortening {
     pub rank: usize,
     pub vowel: bool,
     pub min_syllables: usize,
+    pub any: bool,
 }
 
 #[derive(Deserialize, Default)]
@@ -339,13 +347,22 @@ impl Rules {
             brevity: raw
                 .brevity
                 .into_iter()
-                .map(|b| Shortening {
-                    step: b.step,
-                    rank: b.rank,
-                    vowel: b.vowel,
-                    min_syllables: b.min_syllables,
+                .map(|b| {
+                    Ok(Shortening {
+                        step: b.step,
+                        rank: b.rank,
+                        vowel: b.vowel,
+                        min_syllables: b.min_syllables,
+                        any: match b.order.as_deref() {
+                            None | Some("strict") => false,
+                            Some("any") => true,
+                            Some(other) => {
+                                bail!("[[brevity]] order = {other:?}: use \"any\" or \"strict\"")
+                            }
+                        },
+                    })
                 })
-                .collect(),
+                .collect::<Result<_>>()?,
         })
     }
 
@@ -564,8 +581,12 @@ impl Rules {
         }
         match step.step {
             Step::Lead | Step::Lean => self.leading(step.step, word, sounds).into_iter().collect(),
+            Step::Fold => self
+                .outline_folded(word, sounds, false, true)
+                .into_iter()
+                .collect(),
             Step::Skeleton | Step::Shell | Step::Ends => self
-                .skeletons(word, sounds)
+                .skeletons_folded(word, sounds, step.any)
                 .into_iter()
                 .filter(|(kind, vowel, _)| *kind == step.step && *vowel == step.vowel)
                 .map(|(_, _, stroke)| vec![stroke])
@@ -577,7 +598,18 @@ impl Rules {
     /// after its first vowel folded onto the right hand, with the stressed vowel or without. Which
     /// consonants depends on the step: all of them, those of the stressed and last syllables, or
     /// those of the last syllable only.
+    #[cfg(test)]
     pub fn skeletons(&self, word: &str, sounds: &[String]) -> Vec<(Step, bool, Stroke)> {
+        self.skeletons_folded(word, sounds, false)
+    }
+
+    /// [`Self::skeletons`], with the consonants allowed out of steno order (`any`) or not.
+    fn skeletons_folded(
+        &self,
+        word: &str,
+        sounds: &[String],
+        any: bool,
+    ) -> Vec<(Step, bool, Stroke)> {
         let labelled = self.label(word, sounds);
         let (prefix, skip) = self.prefix(word, &labelled).unzip();
         let Some(syllables) = self.syllables(&labelled[skip.unwrap_or(0)..]) else {
@@ -586,13 +618,8 @@ impl Rules {
         if syllables.len() + usize::from(prefix.is_some()) < 2 {
             return Vec::new();
         }
-        let Some(onset) =
-            Self::consonants(&syllables[0].onset, &self.onset, &self.onset_cluster, false)
-        else {
-            return Vec::new();
-        };
-        let onset = Stroke(onset.0 | prefix.map_or(0, |p| p.0));
-        // The consonants of a syllable, in order, with the `R` a reduced `ER` hides
+        // The consonants of a syllable, in order, with the `R` a reduced `ER` hides and without
+        // the glide `Y` of `opinion`, `brilliant`
         let consonants_of = |syllable: &Syllable, with_onset: bool| -> Vec<String> {
             let mut sounds: Vec<String> = Vec::new();
             if with_onset {
@@ -602,8 +629,54 @@ impl Rules {
                 sounds.push("R".into());
             }
             sounds.extend(syllable.coda.iter().cloned());
+            sounds.retain(|s| plain(s) != "Y");
             sounds
         };
+        // An unstressed first syllable is not a syllable here: its consonants are the left hand
+        // (`in-` TPH, `be-` PW) and the next syllable's onset joins them when it comes after in
+        // order (`believe` PWHR); with no consonants it is dropped (`opinion` P-PB)
+        let in_order = |a: Stroke, b: Stroke| match (a.highest(), b.lowest()) {
+            (Some(high), Some(low)) => high <= low,
+            _ => true,
+        };
+        let left =
+            |sounds: &[String]| Self::consonants(sounds, &self.onset, &self.onset_cluster, false);
+        let mut start = 0;
+        let mut onset = Stroke(0);
+        // Whether the first kept syllable's own onset goes on the right hand with the rest
+        let mut onset_right = false;
+        if syllables.len() >= 2 && syllables[0].vowel.ends_with('0') {
+            let lead = &syllables[0];
+            let coda: Vec<String> = lead
+                .coda
+                .iter()
+                .filter(|s| plain(s) != "Y")
+                .cloned()
+                .collect();
+            let mut keys = left(&lead.onset).unwrap_or_default();
+            if let Some(c) = left(&coda)
+                && in_order(keys, c)
+            {
+                keys.0 |= c.0;
+            }
+            start = 1;
+            match left(&syllables[1].onset) {
+                Some(next) if in_order(keys, next) => onset = Stroke(keys.0 | next.0),
+                _ if keys.is_empty() => start = 0,
+                _ => {
+                    onset = keys;
+                    onset_right = true;
+                }
+            }
+        }
+        if start == 0 {
+            let Some(own) = left(&syllables[0].onset) else {
+                return Vec::new();
+            };
+            onset = own;
+        }
+        let onset = Stroke(onset.0 | prefix.map_or(0, |p| p.0));
+        let syllables = &syllables[start..];
         let last = syllables.len() - 1;
         let stress = syllables
             .iter()
@@ -612,7 +685,7 @@ impl Rules {
         // From the most to the fewest consonants kept: all of them, then those of the stressed
         // and last syllables, then those of the last syllable only
         let mut choices: Vec<(Step, Vec<String>)> = Vec::new();
-        let first_coda = consonants_of(&syllables[0], false);
+        let first_coda = consonants_of(&syllables[0], onset_right);
         let mut all = first_coda.clone();
         for syllable in &syllables[1..] {
             all.extend(consonants_of(syllable, true));
@@ -630,7 +703,9 @@ impl Rules {
             some.extend(consonants_of(&syllables[last], true));
         }
         choices.push((Step::Shell, some));
-        choices.push((Step::Ends, consonants_of(&syllables[last], true)));
+        if last > 0 {
+            choices.push((Step::Ends, consonants_of(&syllables[last], true)));
+        }
 
         // The vowel of the syllable with the main stress
         let key = syllables[stress].vowel.as_str();
@@ -648,7 +723,7 @@ impl Rules {
         for (step, rest) in choices {
             // The consonants in steno order, as they are read; a form with no left hand and no
             // vowel is not offered
-            let Some(coda) = Self::consonants(&rest, &self.coda, &self.coda_cluster, false) else {
+            let Some(coda) = Self::consonants(&rest, &self.coda, &self.coda_cluster, any) else {
                 continue;
             };
             if coda.is_empty() {
@@ -744,10 +819,21 @@ impl Rules {
     }
 
     fn outline_with(&self, word: &str, sounds: &[String], clash: bool) -> Option<Vec<Stroke>> {
+        self.outline_folded(word, sounds, clash, self.fold_any)
+    }
+
+    /// The outline with the folded consonants allowed out of steno order (`any`) or not.
+    fn outline_folded(
+        &self,
+        word: &str,
+        sounds: &[String],
+        clash: bool,
+        any: bool,
+    ) -> Option<Vec<Stroke>> {
         let labelled = self.label_with(word, sounds, clash);
         let (prefix, skip) = self.prefix(word, &labelled).unzip();
         let syllables = self.syllables(&labelled[skip.unwrap_or(0)..])?;
-        let mut strokes = self.strokes_for(&syllables)?;
+        let mut strokes = self.strokes_for(&syllables, any)?;
         if let Some(prefix) = prefix {
             // The prefix keys join the first stroke's own left-hand keys, sharing any they both
             // use: `KP` + `PEBGT` is `KPEBGT`, `STK` + `TAPBS` is `STKAPBS`
@@ -757,7 +843,7 @@ impl Rules {
     }
 
     /// The strokes for a run of syllables, folding reduced ones onto the stroke before.
-    fn strokes_for(&self, syllables: &[Syllable]) -> Option<Vec<Stroke>> {
+    fn strokes_for(&self, syllables: &[Syllable], any: bool) -> Option<Vec<Stroke>> {
         let mut strokes: Vec<Stroke> = Vec::new();
         let mut previous: Option<Syllable> = None;
         for syllable in syllables.iter().cloned() {
@@ -773,7 +859,7 @@ impl Rules {
                 // Some consonants may land out of order (Plover's -RT for `-ter`, -LT for `-tly`)
                 let loose = added.iter().all(|s| self.loose.contains(plain(s)));
                 merged.coda.extend(added);
-                if let Some(stroke) = self.stroke_for(&merged, self.fold_any || loose) {
+                if let Some(stroke) = self.stroke_for(&merged, any || loose) {
                     *strokes.last_mut()? = stroke;
                     previous = Some(merged);
                     continue;
@@ -788,7 +874,7 @@ impl Rules {
                     coda: syllable.coda.clone(),
                 };
                 if !syllable.onset.is_empty()
-                    && let Some(stroke) = self.stroke_for(&stem, self.fold_any)
+                    && let Some(stroke) = self.stroke_for(&stem, any)
                     && let Some(rest) = self.continuation(&suffix)
                 {
                     *strokes.last_mut()? = stroke;
@@ -823,7 +909,7 @@ impl Rules {
         }
         let mut consonants = first.onset.clone();
         consonants.extend(first.coda.iter().cloned());
-        let mut rest = self.strokes_for(&syllables[1..])?;
+        let mut rest = self.strokes_for(&syllables[1..], self.fold_any)?;
         match step {
             Step::Lead if consonants.is_empty() => Some(rest),
             Step::Lean if !consonants.is_empty() => {
@@ -979,7 +1065,14 @@ mod tests {
             forms("condition", "K AH0 N D IH1 SH AH0 N"),
             ["ends K-PB", "ends+v KEUPB"]
         );
-        // With no left hand there is no short form
-        assert!(forms("america", "AH0 M EH1 R IH0 K AH0").is_empty());
+        // A dropped `a-` leaves the next onset as the left hand; a form never lacks one
+        let america = forms("america", "AH0 M EH1 R IH0 K AH0");
+        assert!(america.iter().all(|f| f.contains(" PH")), "{america:?}");
+        // An unstressed `in-` is the left hand, with the rest on the right
+        let information = forms("information", "IH2 N F ER0 M EY1 SH AH0 N");
+        assert!(
+            information.iter().all(|f| f.contains(" TPH")),
+            "{information:?}"
+        );
     }
 }

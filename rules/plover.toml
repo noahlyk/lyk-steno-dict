@@ -578,31 +578,43 @@ step = "lean"       # its consonants go on the left hand of the next stroke: `be
 rank = 100000
 
 [[brevity]]
+step = "fold"       # reduced syllables folded out of steno order where they would not fit in it,
+rank = 100000       # as Plover does: `student` STAOUPBTD, `goodness` TKPWAOPBSD
+
+# One-stroke forms for long words. `order = "any"` lets the folded consonants land out of steno
+# order (Plover's -RT, -PBGD); without it only forms in reading order are offered.
+[[brevity]]
 step = "skeleton"   # one stroke: the first consonants, then every consonant after the first vowel
 rank = 8000
-vowel = false
-min_syllables = 3   # with no vowel at all, only for long words
+order = "any"
 
 [[brevity]]
 step = "skeleton"
 rank = 8000
+vowel = false
+min_syllables = 3   # with no vowel at all, only for long words
+order = "any"
 
 [[brevity]]
 step = "shell"      # one stroke: the first consonants and those of the stressed and last syllables
 rank = 8000
-vowel = false
-min_syllables = 3
+order = "any"
 
 [[brevity]]
 step = "shell"
 rank = 8000
+vowel = false
+min_syllables = 3
+order = "any"
 
 [[brevity]]
 step = "ends"       # one stroke: the first consonants and those of the last syllable
 rank = 8000
-vowel = false
-min_syllables = 3
+order = "any"
 
 [[brevity]]
 step = "ends"
 rank = 8000
+vowel = false
+min_syllables = 3
+order = "any"

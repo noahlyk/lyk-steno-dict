@@ -193,9 +193,7 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
     };
     let mut groups: HashMap<String, Vec<&str>> = HashMap::new();
     for (word, _) in &words {
-        if !pinned.contains(word.as_str())
-            && let Some(outline) = usual(word)
-        {
+        if let Some(outline) = usual(word) {
             groups
                 .entry(render_outline(&outline))
                 .or_default()
@@ -225,6 +223,7 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
         .iter()
         .filter(|(text, members)| members.len() > 1 || taken.contains_key(text.as_str()))
         .flat_map(|(_, members)| members.iter().copied())
+        .filter(|w| !pinned.contains(*w))
         .collect();
     clashing.sort_by_key(|w| (setup.rank[*w], *w));
     {
@@ -251,9 +250,12 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
         }
     }
     for (word, _) in &words {
-        if pinned.contains(word.as_str()) || spelled.contains(word.as_str()) {
+        if spelled.contains(word.as_str()) {
             continue;
         }
+        // A word with a brief keeps it as its settled form: it gets its rule outline and short
+        // forms where they are free, but no star forms
+        let briefed = pinned.contains(word.as_str());
         let mut outlines: Vec<Vec<Stroke>> = Vec::new();
         for sounds in &setup.pron[word.as_str()] {
             if let Some(outline) = setup.rules.outline(word, sounds)
@@ -263,14 +265,17 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
             }
         }
         let Some((first, others)) = outlines.split_first() else {
-            unresolved.push((*word).clone());
+            if !briefed {
+                unresolved.push((*word).clone());
+            }
             continue;
         };
         let mut placed = false;
         let mut lost_to: Option<String> = None;
         // The commonest long words go first for the fewest keys: the shortening steps, in order.
-        // Only where they save a stroke; the outline by the rules is added as well below.
-        let mut options: Vec<(Origin, Vec<Stroke>)> = Vec::new();
+        // Only where they save a stroke; the outline by the rules is added as well. Each short
+        // form is a group of its plain and starred forms, of which the first free one is used.
+        let mut options: Vec<(Origin, Vec<Vec<Stroke>>)> = Vec::new();
         let own = setup.rank[word.as_str()];
         for short in setup
             .rules
@@ -280,33 +285,55 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
         {
             for sounds in &setup.pron[word.as_str()] {
                 for outline in setup.rules.shorten(*short, word, sounds) {
-                    // Never an outline some word has by the rules: those stay theirs
-                    let text = render_outline(&outline);
-                    if outline.len() < first.len()
-                        && !simple.contains(&text)
-                        && !wanted.contains(&text)
-                        && !options.iter().any(|(_, o)| o == &outline)
-                    {
-                        options.push((Origin::Short(short.step), outline));
+                    if outline.len() >= first.len() {
+                        continue;
+                    }
+                    // Never an outline some word has by the rules: those stay theirs. When the
+                    // form is taken, a star on it still beats a whole extra stroke.
+                    let starred: Vec<Vec<Stroke>> = ladder(&outline, join)
+                        .into_iter()
+                        .filter(|(n, _)| *n <= 2)
+                        .map(|(_, o)| o)
+                        .collect();
+                    let group: Vec<Vec<Stroke>> = std::iter::once(outline)
+                        .chain(starred)
+                        .filter(|outline| {
+                            let text = render_outline(outline);
+                            !simple.contains(&text)
+                                && !wanted.contains(&text)
+                                && !options.iter().any(|(_, g)| g.contains(outline))
+                        })
+                        .collect();
+                    if !group.is_empty() {
+                        options.push((Origin::Short(short.step), group));
                     }
                 }
             }
         }
-        options.push((Origin::Rules, first.clone()));
-        options.extend(
-            ladder(first, join)
-                .into_iter()
-                .map(|(n, o)| (Origin::Ladder(n), o)),
-        );
-        for (origin, mut outline) in options {
-            setup.rules.joined(&mut outline);
-            let text = render_outline(&outline);
-            if let Some(holder) = taken.get(&text) {
-                // Who has the outline the rules give this word (not one of its short forms)
-                if origin == Origin::Rules {
-                    lost_to = Some(holder.clone());
+        options.push((Origin::Rules, vec![first.clone()]));
+        if !briefed {
+            options.extend(
+                ladder(first, join)
+                    .into_iter()
+                    .map(|(n, o)| (Origin::Ladder(n), vec![o])),
+            );
+        }
+        for (origin, group) in options {
+            // Every short form that is free is added: the dictionary has all of a word's forms,
+            // and the cheapest counts. A rule or ladder outline settles the word.
+            if placed && !matches!(origin, Origin::Short(_)) {
+                break;
+            }
+            for mut outline in group {
+                setup.rules.joined(&mut outline);
+                let text = render_outline(&outline);
+                if let Some(holder) = taken.get(&text) {
+                    // Who has the outline the rules give this word (not one of its short forms)
+                    if origin == Origin::Rules {
+                        lost_to = Some(holder.clone());
+                    }
+                    continue;
                 }
-            } else {
                 taken.insert(text, (*word).clone());
                 let lost_to = if matches!(origin, Origin::Ladder(_)) {
                     lost_to.clone()
@@ -319,25 +346,14 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
                     origin,
                     lost_to,
                 });
-                placed = true;
+                if !matches!(origin, Origin::Short(_)) {
+                    placed = true;
+                }
                 break;
             }
         }
-        if !placed {
+        if !placed && !briefed {
             unresolved.push((*word).clone());
-        }
-        // A word with a short form keeps the outline the rules give it too, when it is free
-        let mut by_rule = first.clone();
-        setup.rules.joined(&mut by_rule);
-        let text = render_outline(&by_rule);
-        if placed && !taken.contains_key(&text) {
-            taken.insert(text, (*word).clone());
-            entries.push(Entry {
-                word: (*word).clone(),
-                outline: by_rule,
-                origin: Origin::Rules,
-                lost_to: None,
-            });
         }
         // Other pronunciations are only added where they clash with nothing
         for outline in others {
@@ -416,6 +432,15 @@ pub fn build(setup: &Setup, briefs: &Briefs, common: usize, out: &Path) -> Resul
         Some((outline.len(), keys(&outline)))
     };
     let mut total = [0f64; 7];
+    // The same, by how common the word is: where the keys go
+    const BANDS: [(usize, &str); 5] = [
+        (100, "top 100"),
+        (1_000, "100-1k"),
+        (5_000, "1k-5k"),
+        (20_000, "5k-20k"),
+        (usize::MAX, "20k+"),
+    ];
+    let mut bands = [[0f64; 4]; BANDS.len()];
     let mut worse: Vec<(f64, &str, u32, u32)> = Vec::new();
     for (word, &(strokes, key_count)) in &ours {
         let (Some(plover), Some(lapwing)) = (
@@ -432,6 +457,12 @@ pub fn build(setup: &Setup, briefs: &Briefs, common: usize, out: &Path) -> Resul
         total[4] += weight * f64::from(plover.1);
         total[5] += weight * lapwing.0 as f64;
         total[6] += weight * f64::from(lapwing.1);
+        let rank = setup.rank.get(*word).copied().unwrap_or(usize::MAX);
+        let band = BANDS.iter().position(|(to, _)| rank < *to).unwrap_or(0);
+        bands[band][0] += weight;
+        bands[band][1] += weight * f64::from(key_count);
+        bands[band][2] += weight * f64::from(plover.1);
+        bands[band][3] += weight * f64::from(lapwing.1);
         if key_count > plover.1 {
             worse.push((
                 weight * f64::from(key_count - plover.1),
@@ -453,6 +484,20 @@ pub fn build(setup: &Setup, briefs: &Briefs, common: usize, out: &Path) -> Resul
             "  {name:<9} {:>7.3} {:>8.3}",
             strokes / total[0],
             key_count / total[0]
+        );
+    }
+    println!("\nkeys per word by how common the word is, and the share of all words said");
+    println!("            share     this   plover  lapwing");
+    for ((_, name), band) in BANDS.iter().zip(&bands) {
+        if band[0] == 0.0 {
+            continue;
+        }
+        println!(
+            "  {name:<9} {:>5.1}%  {:>7.3}  {:>7.3}  {:>7.3}",
+            100.0 * band[0] / total[0],
+            band[1] / band[0],
+            band[2] / band[0],
+            band[3] / band[0]
         );
     }
     println!("\nthe commonest words that lost their outline to a word that sounds the same");

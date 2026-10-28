@@ -174,6 +174,17 @@ pub fn explain(setup: &Setup, word: &str) -> Result<()> {
     }
     let (plover, lapwing) = setup.gold.shortest(&word);
     println!("ours    {}", setup.candidates(&word).join("  "));
+    for step in setup.rules.brevity() {
+        let forms: Vec<String> = variants
+            .iter()
+            .flat_map(|sounds| setup.rules.shorten(*step, &word, sounds))
+            .map(|o| render_outline(&o))
+            .collect();
+        if !forms.is_empty() {
+            let vowel = if step.vowel { "" } else { " (no vowel)" };
+            println!("  {}{vowel}: {}", step.step, forms.join("  "));
+        }
+    }
     println!(
         "plover  {}",
         setup

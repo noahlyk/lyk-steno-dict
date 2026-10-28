@@ -51,13 +51,20 @@ written in Rust, with the rules as data. American English only.
    unstressed first syllable that is only a vowel (*about* PWOUT, *again* TKPWEPB, *around*
    ROUPBD); `lean` puts the consonants of an unstressed first syllable on the left hand of the
    next stroke when they come first in steno order (*believe* PWHRAOEF, *deliver* TKHREUFR,
-   *complete* KPHRAOET). The one-stroke steps for long words: `skeleton` is one
+   *complete* KPHRAOET). `fold` is the outline with reduced syllables folded out of steno order
+   where they would not fit in it, as Plover does (*student* STAOUPBTD, *goodness*
+   TKPWAOPBSD). The one-stroke steps for long words: `skeleton` is one
    stroke of the first consonants and every consonant after the first vowel, `shell` keeps those
    of the stressed and last syllables, `ends` those of the last; each with or without the
    stressed vowel. An empty list gives a Lapwing-like dictionary, a stroke per syllable; a huge
    rank on every step gives the shortest one the rules allow. Words that take no step are written
-   by rule 5. A short form never takes an outline that any word has by the rules, so the forms a
-   learner can work out stay theirs.
+   by rule 5. An unstressed first syllable gives a one-stroke form its left hand (*information*
+   TPH-FGS, *condition* K-PB, *opinion* P*PB), and the glide of *-ion* is not written. A short
+   form never takes an outline that any word has by the rules, so the forms a learner can work
+   out stay theirs; when a short form is taken, a star on it is tried before giving up, since a
+   star costs a key and a longer form costs a stroke. A word keeps every free short form beside
+   its rule outline, and a word with a brief keeps that too, so the dictionary holds both ends of
+   the spectrum and the cheapest counts.
 8. **Judged by cost.** `build` prints how many strokes and keys a word takes on average, weighted
    by how often it is said, next to Plover and Lapwing on the same words.
 
@@ -82,9 +89,21 @@ Longer words differ mostly where Plover and Lapwing have a brief, and where lyk 
 
 | | Strokes | Keys |
 |---|---|---|
-| this | 1.065 | 4.151 |
+| this | 1.033 | 4.019 |
 | Plover | 1.051 | 4.085 |
 | Lapwing | 1.051 | 4.164 |
+
+By how common the word is (`build` prints this), keys per word:
+
+| Words | Share of all words said | this | Plover | Lapwing |
+|---|---|---|---|---|
+| top 100 | 57% | 2.81 | 2.82 | 2.91 |
+| 100 to 1,000 | 28% | 5.04 | 5.18 | 5.23 |
+| 1,000 to 5,000 | 10% | 6.14 | 6.42 | 6.52 |
+| 5,000 to 20,000 | 4% | 8.04 | 7.87 | 8.06 |
+
+The top thousand words are briefs in all three, which is why the dictionaries are close: the
+rules can only move the rest.
 
 That is with the join key on every continuation stroke counted, and with a Plover outline
 counted only when Lapwing has it too: Plover's `main.json` is full of misstrokes (`O` for *to*,
