@@ -83,6 +83,7 @@ ER = "UR"
 "IY.ea" = "AE"
 "AA.al" = "AU"
 "AA.a" = "A"
+"EY.alt" = "AE"
 "AH.o" = "O"
 "ER.or" = "OR"
 "ER.ear" = "ER"
@@ -105,6 +106,22 @@ ER = "UR"
 
 # A run of consonants at the start of a syllable that is not just the keys one after the other
 [onset_cluster]
+# A consonant and the `Y` of `view`, `music`, `million`: the Y is part of the vowel after it
+"P Y" = "P"
+"B Y" = "PW"
+"T Y" = "T"
+"D Y" = "TK"
+"K Y" = "K"
+"G Y" = "TKPW"
+"F Y" = "TP"
+"V Y" = "SR"
+"M Y" = "PH"
+"N Y" = "TPH"
+"L Y" = "HR"
+"HH Y" = "H"
+"TH Y" = "TH"
+"S Y" = "S"
+"Z Y" = "STKPW"
 
 # A run of consonants at the end of a syllable that is not just the keys one after the other.
 # Plover folds some of these onto a star.
@@ -115,6 +132,12 @@ ER = "UR"
 "S K" = "-FBG"
 "S P" = "-FP"
 "N CH" = "-FRPB"
+"Z D" = "-DZ"
+"N JH" = "-PBLG"
+"L F" = "-FL"
+"L V" = "-FL"
+"K S T" = "-BGT"
+"D Z.s" = "-DZ"
 "S T.ed" = "-FD"
 "SH.tion N" = "-GS"
 
@@ -213,6 +236,7 @@ contains = "u"
 sound = "IY"
 label = "IY.ea"
 contains = "ea"
+clash = true
 
 [[spelled]]
 sound = "IH"
@@ -264,6 +288,14 @@ sound = "SH"
 label = "SH.tion"
 contains = "sion"
 min_syllables = 2
+
+# Words that sound the same are told apart by their spelling. `sail` (`ai`) keeps the full vowel;
+# `sale`, with a silent e and no `ai`, `ay`, `ei` or `ey`, moves to the short one.
+[[spelled]]
+sound = "EY"
+label = "EY.alt"
+unless = ["ai", "ay", "ei", "ey"]
+clash = true
 
 [reduce]
 vowels = ["AH", "IH", "ER"]

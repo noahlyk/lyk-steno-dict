@@ -72,11 +72,19 @@ pub struct Spelled {
     pub contains: Option<String>,
     /// The word has at least this many syllables
     pub min_syllables: Option<usize>,
+    /// The word has none of these in it
+    #[serde(default)]
+    pub unless: Vec<String>,
+    /// Only used to tell apart words that sound the same: the word is written this way when
+    /// another word would otherwise have the same outline
+    #[serde(default)]
+    pub clash: bool,
 }
 
 impl Spelled {
     fn applies(&self, word: &str, at: usize, count: usize, syllables: usize) -> bool {
         self.min_syllables.is_none_or(|n| syllables >= n)
+            && !self.unless.iter().any(|s| word.contains(s.as_str()))
             && self
                 .starts
                 .as_ref()
@@ -243,10 +251,9 @@ impl Rules {
                 .copied()
         })?;
         let coda = Self::consonants(coda, &self.coda, &self.coda_cluster, fold)?;
-        // The consonants after a joined vowel and consonant have to come after it
-        if let (Some(a), Some(b)) = (Stroke(vowel.0 & Stroke::RIGHT).highest(), coda.lowest())
-            && b <= a
-        {
+        // A vowel with an `R` of its own and a consonant before the `R` on the keys, as in `serve`
+        // or `march`, fold together; a key used twice does not
+        if vowel.0 & coda.0 & Stroke::RIGHT != 0 {
             return None;
         }
         if vowel.0 & coda.0 & Stroke::STAR != 0 {
@@ -258,6 +265,11 @@ impl Rules {
     /// Give the sounds of a word their spelling variants: how the word is spelled can decide
     /// which keys a sound goes on.
     pub fn label(&self, word: &str, sounds: &[String]) -> Vec<String> {
+        self.label_with(word, sounds, false)
+    }
+
+    /// [`Self::label`], also using the rules that only tell apart words that sound the same.
+    fn label_with(&self, word: &str, sounds: &[String], clash: bool) -> Vec<String> {
         let syllables = sounds
             .iter()
             .filter(|s| s.ends_with(|c: char| c.is_ascii_digit()))
@@ -268,7 +280,9 @@ impl Rules {
             .map(|(at, sound)| {
                 let stress: String = sound.chars().filter(char::is_ascii_digit).collect();
                 let rule = self.spelled.iter().find(|r| {
-                    r.sound == plain(sound) && r.applies(word, at, sounds.len(), syllables)
+                    (clash || !r.clash)
+                        && r.sound == plain(sound)
+                        && r.applies(word, at, sounds.len(), syllables)
                 });
                 rule.map_or_else(|| sound.clone(), |r| format!("{}{stress}", r.label))
             })
@@ -435,7 +449,18 @@ impl Rules {
     /// they fit; every other syllable is a stroke of its own. `None` if some syllable can't be
     /// written in a stroke by these rules.
     pub fn outline(&self, word: &str, sounds: &[String]) -> Option<Vec<Stroke>> {
-        let mut syllables = self.syllables(&self.label(word, sounds))?;
+        self.outline_with(word, sounds, false)
+    }
+
+    /// How the spelling tells this word from others that sound the same: the outline it takes
+    /// when it has to, if that differs from its usual one.
+    pub fn variant(&self, word: &str, sounds: &[String]) -> Option<Vec<Stroke>> {
+        let alternative = self.outline_with(word, sounds, true)?;
+        (Some(&alternative) != self.outline(word, sounds).as_ref()).then_some(alternative)
+    }
+
+    fn outline_with(&self, word: &str, sounds: &[String], clash: bool) -> Option<Vec<Stroke>> {
+        let mut syllables = self.syllables(&self.label_with(word, sounds, clash))?;
         let mut strokes: Vec<Stroke> = Vec::new();
         let mut previous: Option<Syllable> = None;
         for syllable in syllables.drain(..) {
@@ -501,6 +526,17 @@ mod tests {
     fn an_unstressed_syllable_joins_the_stroke_before_it() {
         assert_eq!(write("living", "L IH1 V IH0 NG"), "HREUFG");
         assert_eq!(write("special", "S P EH1 SH AH0 L"), "SPERBL");
+    }
+
+    #[test]
+    fn spelling_tells_words_that_sound_the_same_apart() {
+        let rules = Rules::built_in().unwrap();
+        let sound = sounds("S EY1 L");
+        // The same outline either way; only the silent-e word moves aside when they clash
+        assert_eq!(write("sail", "S EY1 L"), write("sale", "S EY1 L"));
+        assert_eq!(rules.variant("sail", &sound), None);
+        let sale = rules.variant("sale", &sound).unwrap();
+        assert_eq!(render_outline(&sale), "SAEL");
     }
 
     #[test]

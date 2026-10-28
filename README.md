@@ -19,9 +19,11 @@ the rules as data. American English only.
    consonants join the stroke before it (*living* `HREUFG`, *special* `SPERBL`). The commonest
    long words can instead be one stroke of just their consonants, the fewest keys a word can
    take (`skeleton_rank` in the rules).
-5. **Words that sound the same** are settled in a fixed order, the commonest word first: the
-   plain outline, then a star on the first stroke, a star on the last, then one and two extra
-   star strokes. Nothing depends on the order words are listed in.
+5. **Words that sound the same** are settled in this order. First the briefs. Then the spelling
+   decides: `sail` (`ai`) keeps the full vowel `SAEUL`, and `sale` (silent e) takes the short
+   one `SAEL`, whichever is commoner. Then the commonest word keeps the plain outline and the
+   rest take a star on the first stroke, a star on the last, then one and two extra star
+   strokes. A skeleton never takes an outline that a one-syllable word's own rules produce.
 6. **Judged by cost.** `build` prints how many strokes and keys a word takes on average, weighted
    by how often it is said, next to Plover and Lapwing on the same words. The aim is fewer keys
    overall.
@@ -29,14 +31,14 @@ the rules as data. American English only.
 ## Where it stands
 
 On the 20,000 most common words that Plover or Lapwing write and CMUdict pronounces, the rules
-alone write the word the way Plover or Lapwing does for:
+write 99.4% of them, and write the word the way Plover or Lapwing does for:
 
 | Syllables | Same as Plover or Lapwing |
 |---|---|
-| 1 | 80% |
-| 2 | 41% |
-| 3 | 22% |
-| 4+ | 12% |
+| 1 | 85% |
+| 2 | 43% |
+| 3 | 23% |
+| 4+ | 13% |
 
 Longer words differ on purpose: the rules are predictable where Plover's briefs are not.
 
@@ -44,16 +46,21 @@ Longer words differ on purpose: the rules are predictable where Plover's briefs 
 
 | | Strokes | Keys |
 |---|---|---|
-| this | 1.034 | 3.633 |
-| Plover | 1.035 | 3.673 |
-| Lapwing | 1.037 | 4.069 |
+| this | 1.040 | 3.704 |
+| Plover | 1.037 | 3.708 |
+| Lapwing | 1.039 | 4.114 |
+
+About 1,400 words end up with a star form because another word sounds the same and has the
+plain outline (`site` and `sight`, `mail` and `male` where the vowels can't tell them apart).
+`build` lists the commonest of them. 214 of the 30,000 words can't be written in one stroke
+per syllable by these rules yet.
 
 ## The join key
 
 `join_key = true` in the rules marks every stroke after the first of a word with a join key
 (`^`), so those strokes live apart from the standalone words and can be short and overlap. The
-cost is one key on every continuation. With the strokes as they are now it costs 3.662 keys per
-word, slightly more than without (3.633): the saving needs continuation strokes written for it,
+cost is one key on every continuation. With the strokes as they are, it costs about 0.03 keys
+per word more than without: the saving needs continuation strokes written for it,
 which is the next step. Plover cannot read these strokes.
 
 ## Use

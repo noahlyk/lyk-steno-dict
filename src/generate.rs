@@ -43,6 +43,8 @@ pub enum Origin {
     Rules,
     /// A long word written as one stroke of its consonants
     Skeleton,
+    /// The spelling told it from a word that sounds the same
+    Spelling,
     /// Another pronunciation of a word
     Alternate,
     /// The ladder step that settled a clash: 1 is the star on the first stroke
@@ -53,6 +55,8 @@ pub struct Entry {
     pub word: String,
     pub outline: Vec<Stroke>,
     pub origin: Origin,
+    /// The word that has the outline this one wanted
+    pub lost_to: Option<String>,
 }
 
 pub struct Generated {
@@ -111,7 +115,12 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
     let mut words: Vec<(&String, usize)> = setup
         .rank
         .iter()
-        .filter(|(w, r)| **r < common && setup.pron.contains_key(w.as_str()))
+        .filter(|(w, r)| {
+            **r < common
+                && setup.pron.contains_key(w.as_str())
+                && w.len() >= 2
+                && w.bytes().all(|b| b.is_ascii_lowercase() || b == b'\'')
+        })
         .map(|(w, r)| (w, *r))
         .collect();
     words.sort_by_key(|(w, r)| (*r, w.as_str()));
@@ -162,13 +171,82 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
             word: (*word).clone(),
             outline,
             origin: Origin::Brief,
+            lost_to: None,
         });
     }
 
     let join = setup.rules.join_key();
     let mut unresolved = Vec::new();
+
+    // Words that sound the same and would have the same outline: the spelling decides which one
+    // moves to its own, before frequency decides anything
+    let usual = |word: &str| {
+        setup.pron[word]
+            .iter()
+            .find_map(|sounds| setup.rules.outline(word, sounds))
+    };
+    let mut groups: HashMap<String, Vec<&str>> = HashMap::new();
     for (word, _) in &words {
-        if pinned.contains(word.as_str()) {
+        if !pinned.contains(word.as_str())
+            && let Some(outline) = usual(word)
+        {
+            groups
+                .entry(render_outline(&outline))
+                .or_default()
+                .push(word.as_str());
+        }
+    }
+    // The outlines that one-syllable words have by the rules: the ones a learner would work out
+    let mut simple: HashSet<&String> = HashSet::new();
+    for (text, members) in &groups {
+        let one_syllable = |w: &&str| {
+            setup.pron[*w][0]
+                .iter()
+                .filter(|s| s.ends_with(|c: char| c.is_ascii_digit()))
+                .count()
+                == 1
+        };
+        if members.iter().any(one_syllable) {
+            simple.insert(text);
+        }
+    }
+    // How common the commonest word is that would have each outline by the rules
+    let wanted: HashMap<&String, usize> = groups
+        .iter()
+        .map(|(text, members)| {
+            let rank = members
+                .iter()
+                .map(|w| setup.rank[*w])
+                .min()
+                .unwrap_or(usize::MAX);
+            (text, rank)
+        })
+        .collect();
+    let mut spelled: HashSet<String> = HashSet::new();
+    for members in groups.values().filter(|m| m.len() > 1) {
+        for word in members {
+            let Some(outline) = setup.pron[*word]
+                .iter()
+                .find_map(|sounds| setup.rules.variant(word, sounds))
+            else {
+                continue;
+            };
+            let text = render_outline(&outline);
+            if taken.contains_key(&text) || wanted.contains_key(&text) {
+                continue;
+            }
+            taken.insert(text, (*word).to_owned());
+            spelled.insert((*word).to_owned());
+            entries.push(Entry {
+                word: (*word).to_owned(),
+                outline,
+                origin: Origin::Spelling,
+                lost_to: None,
+            });
+        }
+    }
+    for (word, _) in &words {
+        if pinned.contains(word.as_str()) || spelled.contains(word.as_str()) {
             continue;
         }
         let mut outlines: Vec<Vec<Stroke>> = Vec::new();
@@ -184,12 +262,19 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
             continue;
         };
         let mut placed = false;
+        let mut lost_to: Option<String> = None;
         // The commonest long words go first for the fewest keys: a single skeleton stroke
         let mut options: Vec<(u8, Vec<Stroke>)> = Vec::new();
         if setup.rank[word.as_str()] < setup.rules.skeleton_rank() {
             for sounds in &setup.pron[word.as_str()] {
                 for stroke in setup.rules.skeletons(word, sounds) {
-                    if !options.iter().any(|(_, o)| o == &vec![stroke]) {
+                    // Not an outline a word at least as common would have by the rules
+                    let theirs = wanted.get(&render_outline(&[stroke])).copied();
+                    let own = setup.rank[word.as_str()];
+                    if !simple.contains(&render_outline(&[stroke]))
+                        && theirs.is_none_or(|rank| rank > own)
+                        && !options.iter().any(|(_, o)| o == &vec![stroke])
+                    {
                         options.push((9, vec![stroke]));
                     }
                 }
@@ -199,17 +284,25 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
         options.extend(ladder(first, join));
         for (step, outline) in options {
             let text = render_outline(&outline);
-            if !taken.contains_key(&text) {
+            if let Some(holder) = taken.get(&text) {
+                lost_to.get_or_insert_with(|| holder.clone());
+            } else {
                 taken.insert(text, (*word).clone());
                 let origin = match step {
                     0 => Origin::Rules,
                     9 => Origin::Skeleton,
                     n => Origin::Ladder(n),
                 };
+                let lost_to = if step == 0 || step == 9 {
+                    None
+                } else {
+                    lost_to.clone()
+                };
                 entries.push(Entry {
                     word: (*word).clone(),
                     outline,
                     origin,
+                    lost_to,
                 });
                 placed = true;
                 break;
@@ -227,6 +320,7 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
                     word: (*word).clone(),
                     outline: outline.clone(),
                     origin: Origin::Alternate,
+                    lost_to: None,
                 });
             }
         }
@@ -272,6 +366,13 @@ pub fn build(setup: &Setup, briefs: &Briefs, common: usize, out: &Path) -> Resul
         "  words the rules could not place: {}",
         generated.unresolved.len()
     );
+    let sample: Vec<String> = generated
+        .unresolved
+        .iter()
+        .take(40)
+        .map(|w| format!("{w} ({})", setup.pron[w.as_str()][0].join(" ")))
+        .collect();
+    println!("    the commonest: {}", sample.join(", "));
 
     // Each word's cheapest outline here, and what Plover and Lapwing spend on the same word
     let mut ours: HashMap<&str, (usize, u32)> = HashMap::new();
@@ -322,6 +423,26 @@ pub fn build(setup: &Setup, briefs: &Briefs, common: usize, out: &Path) -> Resul
             "  {name:<9} {:>7.3} {:>8.3}",
             strokes / total[0],
             key_count / total[0]
+        );
+    }
+    println!("\nthe commonest words that lost their outline to a word that sounds the same");
+    let mut lost: Vec<&Entry> = generated
+        .entries
+        .iter()
+        .filter(|e| e.lost_to.is_some() && matches!(e.origin, Origin::Ladder(_)))
+        .collect();
+    lost.sort_by_key(|e| setup.rank.get(&e.word).copied().unwrap_or(usize::MAX));
+    for entry in lost.iter().take(30) {
+        let holder = entry.lost_to.as_deref().unwrap_or("");
+        let theirs = generated
+            .entries
+            .iter()
+            .find(|e| e.word == holder)
+            .map_or_else(String::new, |e| render_outline(&e.outline));
+        println!(
+            "  {:<12} {:<18} (the outline of {holder}: {theirs})",
+            entry.word,
+            render_outline(&entry.outline)
         );
     }
     worse.sort_by(|a, b| b.0.total_cmp(&a.0));
