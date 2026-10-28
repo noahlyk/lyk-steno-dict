@@ -113,14 +113,9 @@ pub fn report(root: &Path) -> Result<()> {
     let sources: Vec<(&str, Pronunciations)> = vec![
         ("cmudict", load_cmudict(&pron.join("cmudict.dict"))?),
         ("mfa us", load_mfa(&pron.join("english_us_mfa.dict"))?),
-        ("mfa uk", load_mfa(&pron.join("english_uk_mfa.dict"))?),
         (
             "wikipron us",
             load_wikipron(&pron.join("wikipron_us_broad.tsv"))?,
-        ),
-        (
-            "wikipron uk",
-            load_wikipron(&pron.join("wikipron_uk_broad.tsv"))?,
         ),
     ];
     println!("pronunciations");
@@ -143,7 +138,7 @@ pub fn report(root: &Path) -> Result<()> {
     let dicts = root.join("dictionaries");
     let plover = word_outlines(&load_dictionary(&dicts.join("plover-main.json"))?);
     let mut lapwing_dict = BTreeMap::new();
-    for name in ["lapwing-base", "lapwing-uk-additions"] {
+    for name in ["lapwing-base"] {
         lapwing_dict.extend(load_dictionary(&dicts.join(format!("{name}.json")))?);
     }
     let lapwing = word_outlines(&lapwing_dict);

@@ -16,15 +16,17 @@ the rules as data.
 6. Optional theory ideas, such as an explicit word-boundary key.
 7. A lookup command that says which rules built an outline.
 
-## Data
+## Use
 
-`scripts/fetch-data.sh` downloads into `data/` (not committed):
+American English only. Everything is Rust subcommands; there are no scripts.
+
+```
+cargo run --release -- fetch    # download the data into data/ (not committed; safe to re-run)
+cargo run --release -- report   # what was loaded, and how well it covers Plover and Lapwing
+```
 
 | What | Source |
 |---|---|
-| Pronunciations | CMUdict, MFA US/UK dictionaries, WikiPron US/UK broad |
+| Pronunciations | CMUdict, MFA US dictionary, WikiPron US broad |
 | Word frequency | hermitdave/FrequencyWords (OpenSubtitles 2018) |
-| Dictionaries to match | Plover `main.json`, Lapwing dictionaries |
-
-`cargo run --release` prints what was loaded and how well the pronunciations cover the words
-Plover and Lapwing write.
+| Dictionaries to match | Plover `main.json` and `commands.json`, Lapwing dictionaries |
