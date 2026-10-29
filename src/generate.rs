@@ -294,9 +294,15 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
         if spelled.contains(word.as_str()) {
             continue;
         }
-        // A word with a brief keeps it as its settled form: it gets its rule outline and short
-        // forms where they are free, but no star forms
-        let briefed = pinned.contains(word.as_str());
+        // A word with a brief keeps it as its only entry: one outline, one way to learn it, and
+        // whatever its rule outline or short forms would have been stays free for some other
+        // word to claim instead. Words are handled once, in rank order, with `taken` checked at
+        // the moment each one claims an outline, so never claiming these on a briefed word's
+        // behalf is enough on its own for a later, less common word to pick them up as its own —
+        // no separate pass is needed.
+        if pinned.contains(word.as_str()) {
+            continue;
+        }
         let mut outlines: Vec<Vec<Stroke>> = Vec::new();
         for sounds in &setup.pron[word.as_str()] {
             if let Some(outline) = setup.rules.outline(word, sounds)
@@ -306,9 +312,7 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
             }
         }
         let Some((first, others)) = outlines.split_first() else {
-            if !briefed {
-                unresolved.push((*word).clone());
-            }
+            unresolved.push((*word).clone());
             continue;
         };
         let mut placed = false;
@@ -352,13 +356,11 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
             }
         }
         options.push((Origin::Rules, vec![first.clone()]));
-        if !briefed {
-            options.extend(
-                ladder(first, join)
-                    .into_iter()
-                    .map(|(n, o)| (Origin::Ladder(n), vec![o])),
-            );
-        }
+        options.extend(
+            ladder(first, join)
+                .into_iter()
+                .map(|(n, o)| (Origin::Ladder(n), vec![o])),
+        );
         for (origin, group) in options {
             // Every short form that is free is added: the dictionary has all of a word's forms,
             // and the cheapest counts. A rule or ladder outline settles the word.
@@ -393,7 +395,7 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
                 break;
             }
         }
-        if !placed && !briefed {
+        if !placed {
             unresolved.push((*word).clone());
         }
         // Other pronunciations are only added where they clash with nothing

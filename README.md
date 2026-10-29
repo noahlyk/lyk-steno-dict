@@ -13,7 +13,13 @@ written in Rust, with the rules as data. American English only.
 
 1. **Briefs first** (`rules/briefs.toml`). The commonest words keep the outlines people already
    know, from Plover by default (`HE`, not `HAOE`) or Lapwing, per word. They are pinned before
-   anything is generated, and nothing generated can take their strokes.
+   anything is generated, and nothing generated can take their strokes. A briefed word gets
+   exactly that one entry: no rule outline, no short form, no alternate pronunciation reachable
+   alongside it. There is only ever one way to stroke the word, faster to learn than picking the
+   cheapest of several, and whatever its rule outline or short forms would have claimed is never
+   reserved, so a later, less common word is free to take it instead — a brief can shorten a
+   completely unrelated word as a side effect, since words are settled once, commonest first,
+   with nothing undone to recheck afterwards.
 2. **Phonetic rules** (`rules/plover.toml`). Where each sound goes on the keyboard in Plover
    theory: consonants at the start of a syllable, the vowel, consonants at the end, and the
    clusters that fold (`NG K` is `*PBG`, `S T` is `-FT`). A vowel with an `R` of its own (`ER`,
@@ -71,9 +77,9 @@ written in Rust, with the rules as data. American English only.
    TPH-FGS, *condition* K-PB, *opinion* P*PB), and the glide of *-ion* is not written. A short
    form never takes an outline that any word has by the rules, so the forms a learner can work
    out stay theirs; when a short form is taken, a star on it is tried before giving up, since a
-   star costs a key and a longer form costs a stroke. A word keeps every free short form beside
-   its rule outline, and a word with a brief keeps that too, so the dictionary holds both ends of
-   the spectrum and the cheapest counts.
+   star costs a key and a longer form costs a stroke. A word with no brief keeps every free short
+   form beside its rule outline, so the dictionary holds both ends of the spectrum and the
+   cheapest counts; a word with a brief has already settled for its one entry (see rule 1).
 8. **Judged by cost.** `build` prints how many strokes and keys a word takes on average, weighted
    by how often it is said, next to Plover and Lapwing on the same words.
 
