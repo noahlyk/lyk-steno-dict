@@ -77,8 +77,10 @@ enum Command {
         /// Where to write the Plover JSON dictionary
         #[arg(long, default_value = "out/lyk.json")]
         out: PathBuf,
-        /// Words to cover, most common first
-        #[arg(long, default_value_t = 30_000)]
+        /// Words to cover, most common first. 100,000 is already in Plover/Lapwing's own
+        /// ballpark and builds in a few seconds; raising it further has diminishing returns,
+        /// bounded by how many words the pronunciation data covers, not by build time
+        #[arg(long, default_value_t = 100_000)]
         common: usize,
         /// Briefs to use instead of the built-in ones
         #[arg(long)]
