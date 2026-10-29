@@ -11,6 +11,10 @@ use std::path::Path;
 
 const BUILT_IN_BRIEFS: &str = include_str!("../rules/briefs.toml");
 
+/// A brief this short was hand-picked by a theory's authors, not derived from frequency: see
+/// [`generate`].
+const TINY_BRIEF_KEYS: u32 = 2;
+
 #[derive(Deserialize, Default)]
 pub struct Briefs {
     /// How many of the most common words get a brief
@@ -128,14 +132,19 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
         .collect();
     words.sort_by_key(|(w, r)| (*r, w.as_str()));
 
-    // Briefs: the common words Plover or Lapwing already write
+    // Briefs: the common words Plover or Lapwing already write, plus any word either of them
+    // writes in two keys or fewer, however rare: a brief that short was hand-picked, not derived
+    // from frequency, so frequency is not what should gate keeping it.
+    let has_tiny_brief = |outlines: Option<&Vec<String>>| {
+        outlines.and_then(|o| shortest(o)).is_some_and(|o| keys(&o) <= TINY_BRIEF_KEYS)
+    };
     for (word, rank) in &words {
-        if *rank >= briefs.count {
+        let plover = setup.gold.plover.get(word.as_str());
+        let lapwing = setup.gold.lapwing.get(word.as_str());
+        if *rank >= briefs.count && !has_tiny_brief(plover) && !has_tiny_brief(lapwing) {
             continue;
         }
         let source = briefs.word.get(word.as_str()).unwrap_or(&briefs.default);
-        let plover = setup.gold.plover.get(word.as_str());
-        let lapwing = setup.gold.lapwing.get(word.as_str());
         let outline = match source.as_str() {
             "plover" => plover.and_then(|o| shortest(o)),
             "lapwing" => lapwing.and_then(|o| shortest(o)),
