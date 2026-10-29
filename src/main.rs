@@ -43,8 +43,8 @@ enum Command {
         /// Briefs to use instead of the built-in ones
         #[arg(long)]
         briefs: Option<PathBuf>,
-        /// Check that the README's score table matches this, instead of printing it; exits
-        /// non-zero and shows the up-to-date table when it doesn't
+        /// Check that docs/benchmarks.md's score table matches this, instead of printing it;
+        /// exits non-zero and shows the up-to-date table when it doesn't
         #[arg(long)]
         check_readme: bool,
     },
@@ -142,7 +142,7 @@ fn main() -> Result<()> {
                 None => generate::Briefs::built_in()?,
             };
             if *check_readme {
-                analysis::check_readme(&setup, &briefs, *common, Path::new("README.md"))
+                analysis::check_readme(&setup, &briefs, *common, Path::new("docs/benchmarks.md"))
             } else {
                 analysis::score(&setup, &briefs, *common)
             }

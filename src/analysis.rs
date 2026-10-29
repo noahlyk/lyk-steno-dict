@@ -270,10 +270,10 @@ fn score_markdown(setup: &Setup, briefs: &generate::Briefs, common: usize) -> Re
 const README_START: &str = "<!-- lyk:score-table:start -->";
 const README_END: &str = "<!-- lyk:score-table:end -->";
 
-/// Whether the README's syllable table still matches what `score` would compute today. Prints
-/// the up-to-date table and returns an error (so CI or a habit of running this before a commit
-/// catches drift) when it doesn't; the README's own markers decide what gets compared, so the
-/// surrounding prose is never touched by this check (or by anything that would write it).
+/// Whether the benchmarks page's syllable table still matches what `score` would compute today.
+/// Prints the up-to-date table and returns an error (so CI or a habit of running this before a
+/// commit catches drift) when it doesn't; the page's own markers decide what gets compared, so
+/// the surrounding prose is never touched by this check (or by anything that would write it).
 pub fn check_readme(
     setup: &Setup,
     briefs: &generate::Briefs,
@@ -290,10 +290,10 @@ pub fn check_readme(
         .with_context(|| format!("{README_END} not found in {}", readme.display()))?;
     let _ = before;
     if current.trim() == fresh.trim() {
-        println!("the README's score table matches: {}", readme.display());
+        println!("the score table matches: {}", readme.display());
         Ok(())
     } else {
-        println!("the README's score table is out of date. it should read:\n");
+        println!("{} has a stale score table. it should read:\n", readme.display());
         println!("{fresh}");
         anyhow::bail!(
             "{} has a stale score table between {README_START} and {README_END} — \
