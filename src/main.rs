@@ -72,6 +72,14 @@ enum Command {
     },
     /// Show how the rules write a word
     Explain { word: String },
+    /// Generate the keymux WASM plugin that reads a stroke back the way these rules would,
+    /// for whatever a dictionary misses: the single source of this logic, so the deployed
+    /// plugin can never drift from the theory it is supposed to mirror
+    Plugin {
+        /// Where to write the plugin's Rust source
+        #[arg(long, default_value = "out/lyk-orthographic-fallback.rs")]
+        out: PathBuf,
+    },
     /// Build the dictionary: briefs first, then the rules, and say what it costs to type
     Build {
         /// Where to write the Plover JSON dictionary
@@ -118,7 +126,8 @@ enum Command {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    let setup = || analysis::Setup::load(&cli.data, cli.rules.as_deref());
+    let setup =
+        |common: Option<usize>| analysis::Setup::load(&cli.data, cli.rules.as_deref(), common);
     match &cli.command {
         Command::Fetch => fetch::run(&cli.data),
         Command::Report => data::report(&cli.data),
@@ -127,7 +136,7 @@ fn main() -> Result<()> {
             briefs,
             check_readme,
         } => {
-            let setup = setup()?;
+            let setup = setup(Some(*common))?;
             let briefs = match briefs {
                 Some(path) => generate::Briefs::load(path)?,
                 None => generate::Briefs::built_in()?,
@@ -143,16 +152,17 @@ fn main() -> Result<()> {
             limit,
             missing,
             after,
-        } => analysis::mismatches(&setup()?, *syllables, *limit, *missing, *after),
-        Command::Learn { min, limit } => analysis::learn(&setup()?, *min, *limit),
-        Command::Explain { word } => analysis::explain(&setup()?, word),
+        } => analysis::mismatches(&setup(None)?, *syllables, *limit, *missing, *after),
+        Command::Learn { min, limit } => analysis::learn(&setup(None)?, *min, *limit),
+        Command::Explain { word } => analysis::explain(&setup(None)?, word),
+        Command::Plugin { out } => write_plugin(cli.rules.as_deref(), out),
         Command::Build {
             out,
             common,
             briefs,
             against,
         } => {
-            let setup = setup()?;
+            let setup = setup(Some(*common))?;
             let briefs = match briefs {
                 Some(path) => generate::Briefs::load(path)?,
                 None => generate::Briefs::built_in()?,
@@ -173,7 +183,7 @@ fn main() -> Result<()> {
             briefs,
             words,
         } => {
-            let setup = setup()?;
+            let setup = setup(Some(*common))?;
             let briefs = match briefs {
                 Some(path) => generate::Briefs::load(path)?,
                 None => generate::Briefs::built_in()?,
@@ -185,7 +195,7 @@ fn main() -> Result<()> {
             common,
             briefs,
         } => {
-            let setup = setup()?;
+            let setup = setup(Some(*common))?;
             let briefs = match briefs {
                 Some(path) => generate::Briefs::load(path)?,
                 None => generate::Briefs::built_in()?,
@@ -205,4 +215,19 @@ fn main() -> Result<()> {
             Ok(())
         }
     }
+}
+
+/// Generate the orthographic-fallback plugin's source and write it to `out`.
+fn write_plugin(rules_path: Option<&Path>, out: &Path) -> Result<()> {
+    let rules = match rules_path {
+        Some(path) => rules::Rules::load(path)?,
+        None => rules::Rules::built_in()?,
+    };
+    let source = rules.generate_plugin();
+    if let Some(parent) = out.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(out, source).with_context(|| out.display().to_string())?;
+    println!("wrote {}", out.display());
+    Ok(())
 }

@@ -1,6 +1,6 @@
 //! Judging the rules against Plover and Lapwing, and learning which rules are missing.
 
-use crate::data::{Pronunciations, load_cmudict, load_frequency};
+use crate::data::{Pronunciations, load_cmudict, load_frequency_bounded};
 use crate::generate;
 use crate::gold::Gold;
 use crate::rules::Rules;
@@ -21,22 +21,42 @@ pub struct Setup {
 }
 
 impl Setup {
-    pub fn load(data: &Path, rules: Option<&Path>) -> Result<Self> {
+    /// `common` bounds how much of the frequency list is worth ranking at all: `None` for every
+    /// command that needs a real rank for any word regardless of commonness (`explain`,
+    /// `learn`, `mismatches`), `Some(n)` for one that already only looks at the `n` most common
+    /// words anyway (`build`, `score`, `quote`, `resolve`), padded past `n` so nothing a caller
+    /// still reads near that edge comes up unranked that would not have been before.
+    pub fn load(data: &Path, rules: Option<&Path>, common: Option<usize>) -> Result<Self> {
         let rules = match rules {
             Some(path) => Rules::load(path)?,
             None => Rules::built_in()?,
         };
-        let frequency = load_frequency(&data.join("frequency/en_full.txt"))?;
+        let freq_limit =
+            common.map_or(usize::MAX, |c| c.saturating_add(c / 5).max(c.saturating_add(10_000)));
+        let freq_path = data.join("frequency/en_full.txt");
+        let pron_path = data.join("pronunciation/cmudict.dict");
+        // Three independent files, none needed before another: load them on their own threads
+        // instead of one after another.
+        let (frequency, pron, gold) = std::thread::scope(|scope| {
+            let frequency = scope.spawn(|| load_frequency_bounded(&freq_path, freq_limit));
+            let pron = scope.spawn(|| load_cmudict(&pron_path));
+            let gold = scope.spawn(|| Gold::load(data));
+            (
+                frequency.join().expect("frequency load panicked"),
+                pron.join().expect("pronunciation load panicked"),
+                gold.join().expect("gold dictionary load panicked"),
+            )
+        });
         let mut rank = HashMap::new();
         let mut count = HashMap::new();
-        for (n, (word, times)) in frequency.into_iter().enumerate() {
+        for (n, (word, times)) in frequency?.into_iter().enumerate() {
             count.entry(word.clone()).or_insert(times);
             rank.entry(word).or_insert(n);
         }
         Ok(Self {
             rules,
-            pron: load_cmudict(&data.join("pronunciation/cmudict.dict"))?,
-            gold: Gold::load(data)?,
+            pron: pron?,
+            gold: gold?,
             rank,
             count,
         })

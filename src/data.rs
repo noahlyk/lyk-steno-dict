@@ -62,9 +62,17 @@ pub fn load_wikipron(path: &Path) -> Result<Pronunciations> {
 
 /// Word counts, most common first: `word count` per line.
 pub fn load_frequency(path: &Path) -> Result<Vec<(String, u64)>> {
+    load_frequency_bounded(path, usize::MAX)
+}
+
+/// [`load_frequency`], stopping after `limit` rows. The file is already in rank order, so this
+/// is the same result a full load's first `limit` entries would give, without paying to parse,
+/// convert and collect the rest of a multi-million-row file nobody asked for.
+pub fn load_frequency_bounded(path: &Path, limit: usize) -> Result<Vec<(String, u64)>> {
     let text = fs::read_to_string(path).with_context(|| path.display().to_string())?;
     Ok(text
         .lines()
+        .take(limit)
         .filter_map(|line| {
             let (word, count) = line.rsplit_once(' ')?;
             Some((word.to_owned(), count.parse().ok()?))
