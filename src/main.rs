@@ -14,7 +14,7 @@ mod stroke;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Parser)]
 #[command(version, about)]
@@ -40,6 +40,13 @@ enum Command {
         /// Only the this many most common words
         #[arg(long, default_value_t = 20_000)]
         common: usize,
+        /// Briefs to use instead of the built-in ones
+        #[arg(long)]
+        briefs: Option<PathBuf>,
+        /// Check that the README's score table matches this, instead of printing it; exits
+        /// non-zero and shows the up-to-date table when it doesn't
+        #[arg(long)]
+        check_readme: bool,
     },
     /// The most common words the rules get wrong
     Mismatches {
@@ -113,7 +120,22 @@ fn main() -> Result<()> {
     match &cli.command {
         Command::Fetch => fetch::run(&cli.data),
         Command::Report => data::report(&cli.data),
-        Command::Score { common } => analysis::score(&setup()?, *common),
+        Command::Score {
+            common,
+            briefs,
+            check_readme,
+        } => {
+            let setup = setup()?;
+            let briefs = match briefs {
+                Some(path) => generate::Briefs::load(path)?,
+                None => generate::Briefs::built_in()?,
+            };
+            if *check_readme {
+                analysis::check_readme(&setup, &briefs, *common, Path::new("README.md"))
+            } else {
+                analysis::score(&setup, &briefs, *common)
+            }
+        }
         Command::Mismatches {
             syllables,
             limit,

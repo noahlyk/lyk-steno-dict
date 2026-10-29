@@ -1,11 +1,13 @@
 //! Judging the rules against Plover and Lapwing, and learning which rules are missing.
 
 use crate::data::{Pronunciations, load_cmudict, load_frequency};
+use crate::generate;
 use crate::gold::Gold;
 use crate::rules::Rules;
 use crate::stroke::{Stroke, render_outline};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use std::collections::{BTreeMap, HashMap};
+use std::fmt::Write as _;
 use std::path::Path;
 
 pub struct Setup {
@@ -93,10 +95,31 @@ struct Tally {
     plover: usize,
     lapwing: usize,
     either: usize,
+    /// Words with both a generated outline and a Plover one, counted toward the keys/stroke
+    /// averages below (not every word has both, so this is its own count, not `words`)
+    costed: usize,
+    this_strokes: f64,
+    this_keys: f64,
+    plover_strokes: f64,
+    plover_keys: f64,
 }
 
-/// How many of the words the rules write the way Plover and Lapwing do, by syllables.
-pub fn score(setup: &Setup, common: usize) -> Result<()> {
+/// `score`'s and `check_readme`'s shared tally: by syllable count, then "all" last.
+fn tallies(setup: &Setup, briefs: &generate::Briefs, common: usize) -> Result<Vec<(String, Tally)>> {
+    // The real, brief-adjusted outline `build` would write for a word, cheapest first: matches
+    // what ships, not just what the bare rules produce.
+    let generated = generate::generate(setup, briefs, common)?;
+    let mut ours: HashMap<&str, (usize, u32)> = HashMap::new();
+    for entry in &generated.entries {
+        let cost = (entry.outline.len(), generate::keys(&entry.outline));
+        let best = ours.entry(entry.word.as_str()).or_insert(cost);
+        *best = (*best).min(cost);
+    }
+    let plover_cost = |word: &str| -> Option<(usize, u32)> {
+        let outline = generate::shortest(setup.gold.plover.get(word)?)?;
+        Some((outline.len(), generate::keys(&outline)))
+    };
+
     let mut by_size: BTreeMap<usize, Tally> = BTreeMap::new();
     let mut total = Tally::default();
     for word in setup.words() {
@@ -110,6 +133,7 @@ pub fn score(setup: &Setup, common: usize) -> Result<()> {
             plover |= p;
             lapwing |= l;
         }
+        let cost = ours.get(word).zip(plover_cost(word));
         let size = setup.syllable_count(word).min(4);
         for tally in [by_size.entry(size).or_default(), &mut total] {
             tally.words += 1;
@@ -117,33 +141,117 @@ pub fn score(setup: &Setup, common: usize) -> Result<()> {
             tally.plover += usize::from(plover);
             tally.lapwing += usize::from(lapwing);
             tally.either += usize::from(plover || lapwing);
+            if let Some((&(this_strokes, this_keys), (plover_strokes, plover_keys))) = cost {
+                tally.costed += 1;
+                tally.this_strokes += this_strokes as f64;
+                tally.this_keys += f64::from(this_keys);
+                tally.plover_strokes += plover_strokes as f64;
+                tally.plover_keys += f64::from(plover_keys);
+            }
         }
     }
+    let mut rows: Vec<(String, Tally)> = by_size
+        .into_iter()
+        .map(|(size, tally)| {
+            let label = if size == 4 {
+                "4+".to_owned()
+            } else {
+                size.to_string()
+            };
+            (label, tally)
+        })
+        .collect();
+    rows.push(("all".to_owned(), total));
+    Ok(rows)
+}
+
+/// How many of the words the rules write the way Plover and Lapwing do, by syllables, and how
+/// many keys each syllable count takes per stroke, lyk next to Plover.
+pub fn score(setup: &Setup, briefs: &generate::Briefs, common: usize) -> Result<()> {
+    let rows = tallies(setup, briefs, common)?;
     println!(
         "the {common} most common words that Plover or Lapwing write and CMUdict pronounces\n"
     );
-    println!("syllables   words  written   plover  lapwing   either");
-    let line = |label: String, t: Tally| {
+    println!("syllables   words  written   plover  lapwing   either  keys/stroke: this  plover");
+    for (label, t) in rows {
         let pct = |n: usize| format!("{:>5.1}%", 100.0 * n as f64 / t.words.max(1) as f64);
+        let per_stroke = |keys: f64, strokes: f64| keys / strokes.max(1.0);
         println!(
-            "{label:<9} {:>7} {:>8} {:>8} {:>8} {:>8}",
+            "{label:<9} {:>7} {:>8} {:>8} {:>8} {:>8}  {:>17.3} {:>7.3}",
             t.words,
             pct(t.written),
             pct(t.plover),
             pct(t.lapwing),
-            pct(t.either)
+            pct(t.either),
+            per_stroke(t.this_keys, t.this_strokes),
+            per_stroke(t.plover_keys, t.plover_strokes),
         );
-    };
-    for (size, tally) in by_size {
-        let label = if size == 4 {
-            "4+".to_owned()
-        } else {
-            size.to_string()
-        };
-        line(label, tally);
     }
-    line("all".into(), total);
     Ok(())
+}
+
+/// The README's syllable table, rendered fresh from `tallies` as the exact markdown it should
+/// contain between the `<!-- lyk:score-table:start/end -->` markers.
+fn score_markdown(setup: &Setup, briefs: &generate::Briefs, common: usize) -> Result<String> {
+    let rows = tallies(setup, briefs, common)?;
+    let pct = |n: usize, of: usize| format!("{:.0}%", 100.0 * n as f64 / of.max(1) as f64);
+    let per_stroke = |keys: f64, strokes: f64| format!("{:.2}", keys / strokes.max(1.0));
+    let mut out = String::new();
+    out.push_str("| Syllables | Same as Plover or Lapwing | Plover | Lapwing | Keys/Stroke (this) | Keys/Stroke (Plover) |\n");
+    out.push_str("|---|---|---|---|---|---|\n");
+    for (label, t) in &rows {
+        // "0" is a handful of pronunciation-lookup artifacts (no real syllable), and "all" is
+        // its own summary line; the README table is just the four real buckets.
+        if label == "all" || label == "0" {
+            continue;
+        }
+        writeln!(
+            out,
+            "| {label} | {} | {} | {} | {} | {} |",
+            pct(t.either, t.words),
+            pct(t.plover, t.words),
+            pct(t.lapwing, t.words),
+            per_stroke(t.this_keys, t.this_strokes),
+            per_stroke(t.plover_keys, t.plover_strokes),
+        )?;
+    }
+    Ok(out)
+}
+
+const README_START: &str = "<!-- lyk:score-table:start -->";
+const README_END: &str = "<!-- lyk:score-table:end -->";
+
+/// Whether the README's syllable table still matches what `score` would compute today. Prints
+/// the up-to-date table and returns an error (so CI or a habit of running this before a commit
+/// catches drift) when it doesn't; the README's own markers decide what gets compared, so the
+/// surrounding prose is never touched by this check (or by anything that would write it).
+pub fn check_readme(
+    setup: &Setup,
+    briefs: &generate::Briefs,
+    common: usize,
+    readme: &Path,
+) -> Result<()> {
+    let fresh = score_markdown(setup, briefs, common)?;
+    let text = std::fs::read_to_string(readme).with_context(|| readme.display().to_string())?;
+    let (before, rest) = text
+        .split_once(README_START)
+        .with_context(|| format!("{README_START} not found in {}", readme.display()))?;
+    let (current, _after) = rest
+        .split_once(README_END)
+        .with_context(|| format!("{README_END} not found in {}", readme.display()))?;
+    let _ = before;
+    if current.trim() == fresh.trim() {
+        println!("the README's score table matches: {}", readme.display());
+        Ok(())
+    } else {
+        println!("the README's score table is out of date. it should read:\n");
+        println!("{fresh}");
+        anyhow::bail!(
+            "{} has a stale score table between {README_START} and {README_END} — \
+             paste the table above over what's there now",
+            readme.display()
+        );
+    }
 }
 
 /// How the rules write a word, syllable by syllable, next to what Plover and Lapwing write.

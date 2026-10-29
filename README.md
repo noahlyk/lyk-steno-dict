@@ -83,12 +83,21 @@ On the 20,000 most common words that Plover or Lapwing write and CMUdict pronoun
 write 99.9% of them, and write the word the way Plover or Lapwing does (ignoring the join key and
 the `KWR` or star they put on a continuation stroke, which the join key replaces) for:
 
-| Syllables | Same as Plover or Lapwing | Plover | Lapwing |
-|---|---|---|---|
-| 1 | 90% | 78% | 83% |
-| 2 | 60% | 45% | 52% |
-| 3 | 39% | 26% | 33% |
-| 4+ | 24% | 17% | 19% |
+<!-- lyk:score-table:start -->
+| Syllables | Same as Plover or Lapwing | Plover | Lapwing | Keys/Stroke (this) | Keys/Stroke (Plover) |
+|---|---|---|---|---|---|
+| 1 | 90% | 78% | 83% | 5.70 | 5.66 |
+| 2 | 60% | 45% | 52% | 5.68 | 4.93 |
+| 3 | 39% | 26% | 33% | 5.29 | 4.80 |
+| 4+ | 24% | 17% | 19% | 5.29 | 4.97 |
+<!-- lyk:score-table:end -->
+
+The last two columns are keys pressed per stroke, lyk next to Plover, on the words both write
+(`score` prints this; `score --check-readme` checks this table is still what it would print, so
+it can be re-run after a dictionary change instead of trusted to stay accurate by hand). Lower is
+not automatically better here — it says how much a stroke is doing, not how short the word comes
+out — but a stroke-count difference between two theories tends to show up here too, since more
+strokes for the same word usually means each one is doing less.
 
 Longer words differ mostly where Plover and Lapwing have a brief, and where lyk writes a bare
 `^-R` for an `-er` they write `*ER`. `mismatches --syllables N
@@ -151,6 +160,7 @@ already missed.
 cargo run --release -- fetch               # download the data into data/ (safe to re-run)
 cargo run --release -- report              # what was loaded
 cargo run --release -- score               # how often the rules match Plover or Lapwing
+cargo run --release -- score --check-readme   # does this README's score table still match?
 cargo run --release -- build               # briefs + rules -> out/lyk.json, with the cost
 cargo run --release -- explain moon        # which rules wrote a word, next to Plover and Lapwing
 cargo run --release -- mismatches --syllables 2 --after 500    # where the rules differ
