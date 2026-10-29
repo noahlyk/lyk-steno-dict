@@ -53,3 +53,35 @@ were = "WR"  # ER reduces (same rule the suffix table uses): W, then the reduced
 # full-digraph form too; this just picks it instead.
 work = "WORBG"
 working = "WORBG/^-G"
+
+# Past this point every word above is ranked in the top 1,500 by frequency, so it would get a
+# brief from `count` alone; naming a word here at all is what pulls it into the window from
+# further out, past wherever `count` stops. That is only done when all of the following hold,
+# checked mechanically rather than by eye, the same way the fragment-vs-dropped-sound split above
+# is: Plover's own outline for the word saves at least three whole keys over what the rules
+# generate for it (a one- or two-key saving this far out barely moves the frequency-weighted cost
+# the rare tier is judged on, so it is left alone even when it exists); that outline's first and
+# last consonants are a whole cluster toward the word's real first and last sound, never a
+# fragment of one (the same `matches_real_consonants` check a plain `plover`/`lapwing` source runs
+# through inside the window); and claiming it does not take a stroke some commoner word already
+# has (checked by rebuilding and confirming nothing new shows up in `build`'s "lost their outline"
+# list). Each is still sourced as `"plover"`, not spelled out as a literal outline, so it goes
+# through that same fragment check instead of being taken on faith:
+contract = "plover"       # KR-T, one stroke, vs. the rules' two-stroke KAPB/TRABGT
+introduce = "plover"      # TROU vs. EUPB/TR/TKAOUS
+investigation = "plover"  # SREGS vs. EUPB/SREFT/TKPWAEUGS
+investigate = "plover"    # SREGT vs. EUPB/SREFT/TKPWAEUT
+organization = "plover"   # ORGS vs. ORPBG/STKPWAEUGS
+individual = "plover"     # SREUD vs. EUPBD/SREUPBLG/W-L
+significant = "plover"    # SEUG vs. SUG/TPHEUFBG/-PBT
+underground = "plover"    # UPBGD vs. URPBD/TKPWROUPBD
+intelligence = "plover"   # SPWELS vs. EUPB/TEL/SKWR-PBS
+intelligent = "plover"    # SPWELT vs. EUPB/TEL/SKWR-PBT
+ordinary = "plover"       # OERD vs. ORD/TPHAEUR/EU
+influence = "plover"      # WEPBS vs. EUPB/TPHRAOUPBS
+unique = "plover"         # AOUPBG vs. KWRAOU/TPHAOEBG
+everyday = "plover"       # EFRD vs. EF/RAOE/TKAEU
+including = "plover"      # KHRUG vs. EUPB/KHRAOUGD
+include = "plover"        # KHRU vs. EUPB/KHRAOUD
+understanding = "plover"  # URBGD vs. URPBD/STAPBGD
+imagination = "plover"    # PHAEGS vs. EUPL/APBLG/TPHAEUGS

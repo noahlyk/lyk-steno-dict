@@ -240,14 +240,18 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
 
     // Briefs: the common words Plover or Lapwing already write, plus any word either of them
     // writes in two keys or fewer, however rare: a brief that short was hand-picked, not derived
-    // from frequency, so frequency is not what should gate keeping it.
+    // from frequency, so frequency is not what should gate keeping it. A word named explicitly in
+    // `[word]` is a third way in, the same reasoning extended past "two keys or fewer" to "someone
+    // looked at this specific word and decided its brief was worth keeping": the frequency window
+    // is a default for words nobody has looked at individually, not a ceiling on them.
     let has_tiny_brief = |outlines: Option<&Vec<String>>| {
         outlines.and_then(|o| shortest(o)).is_some_and(|o| keys(&o) <= TINY_BRIEF_KEYS)
     };
     for (word, rank) in &words {
         let plover = setup.gold.plover.get(word.as_str());
         let lapwing = setup.gold.lapwing.get(word.as_str());
-        if *rank >= briefs.count && !has_tiny_brief(plover) && !has_tiny_brief(lapwing) {
+        let named = briefs.word.contains_key(word.as_str());
+        if *rank >= briefs.count && !has_tiny_brief(plover) && !has_tiny_brief(lapwing) && !named {
             continue;
         }
         let sounds = &setup.pron[word.as_str()][0];

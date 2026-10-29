@@ -31,6 +31,21 @@
    than the seven-key `TKPWAOD` completing it) — but either repair only exists because the word's
    own gold dictionary pointed at that sound to begin with; nothing is invented from nothing.
    Fewest keys then picks among whichever candidates, original or repaired, are left.
+
+   The window itself (`count`) is a default for words nobody has looked at individually, not a
+   ceiling: a word named explicitly in `[word]` gets a brief regardless of rank, the same way a
+   two-key-or-fewer outline already does regardless of rank. That is only done when every one of
+   three things holds, checked mechanically rather than by eye: Plover's own outline saves at
+   least three whole keys over what the rules generate for the word (a one- or two-key saving this
+   far down the frequency list was rejected even where it existed, since it barely moves the
+   frequency-weighted cost the rare tier is judged on); that outline's first and last consonants
+   are a whole cluster toward the word's real first and last sound, never a fragment of one (the
+   same check a plain `plover`/`lapwing` source above already runs through); and claiming it does
+   not take a stroke a commoner word already has by the rules (checked by rebuilding — a rarer
+   word losing its own outline to a star form, the ordinary cost of adding any brief at all, is
+   fine; a commoner one losing its outline because a rarer word's hand-picked brief grabbed it
+   first would not be). `rules/briefs.toml` lists each word this has been done for and what it
+   saves.
 3. **Phonetic rules** (`rules/plover.toml`). Where each sound goes on the keyboard in Plover
    theory: consonants at the start of a syllable, the vowel, consonants at the end, and the
    clusters that fold (`NG K` is `*PBG`, `S T` is `-FT`). A vowel with an `R` of its own (`ER`,

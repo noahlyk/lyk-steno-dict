@@ -106,7 +106,7 @@ they put on a continuation stroke, which the join key replaces) for:
 | Syllables | Same as Plover or Lapwing | Plover | Lapwing | Keys/Stroke (Lyk) | Keys/Stroke (Plover) | Keys/Stroke (Lapwing) |
 |---|---|---|---|---|---|---|
 | 1 | 90% | 78% | 83% | 5.69 | 5.66 | 5.83 |
-| 2 | 60% | 45% | 52% | 5.68 | 4.93 | 5.27 |
+| 2 | 60% | 45% | 52% | 5.67 | 4.93 | 5.27 |
 | 3 | 39% | 26% | 33% | 5.29 | 4.80 | 5.15 |
 | 4+ | 24% | 17% | 19% | 5.30 | 4.97 | 5.22 |
 <!-- lyk:score-table:end -->
@@ -119,9 +119,9 @@ of very common words dominate it and a long tail of rare ones barely move it:
 | Syllables | Keys/Stroke (Lyk, by frequency) | Keys/Stroke (Plover, by frequency) | Keys/Stroke (Lapwing, by frequency) |
 |---|---|---|---|
 | 1 | 3.03 | 3.16 | 3.58 |
-| 2 | 4.91 | 4.70 | 5.00 |
-| 3 | 4.93 | 4.93 | 5.25 |
-| 4+ | 5.17 | 5.24 | 5.50 |
+| 2 | 4.90 | 4.70 | 5.00 |
+| 3 | 4.92 | 4.93 | 5.25 |
+| 4+ | 5.14 | 5.24 | 5.50 |
 <!-- lyk:usage-table:end -->
 
 One-syllable words drop sharply under this weighting for every theory, not just Lyk, because a
@@ -164,7 +164,7 @@ Longer words differ mostly where Plover and Lapwing have a brief, and where Lyk 
 
 | | Strokes | Keys |
 |---|---|---|
-| Lyk | 1.036 | 3.623 |
+| Lyk | 1.036 | 3.618 |
 | Plover | 1.040 | 3.710 |
 | Lapwing | 1.041 | 4.106 |
 
@@ -174,7 +174,7 @@ By how common the word is (`build` prints this), keys per word:
 |---|---|---|---|---|
 | top 100 | 58% | 2.32 | 2.45 | 2.89 |
 | 100 to 1,000 | 28% | 4.67 | 4.81 | 5.17 |
-| 1,000 to 5,000 | 10% | 6.14 | 6.14 | 6.42 |
+| 1,000 to 5,000 | 10% | 6.09 | 6.14 | 6.42 |
 | 5,000 to 20,000 | 4% | 8.03 | 7.47 | 7.88 |
 | 20,000+ | 1% | 10.13 | 8.92 | 9.30 |
 
