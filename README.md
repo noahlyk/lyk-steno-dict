@@ -1,4 +1,4 @@
-# lyk-steno-dict
+# lyk-steno-theory
 
 **lyk is steno with explicit word boundaries.** Every stroke after the first of a word carries a
 join key (`^`), so a stroke without it always starts a word. Continuation strokes live apart from

@@ -1,4 +1,4 @@
-//! lyk-steno-dict: generates a steno dictionary from phonetic rules.
+//! lyk-steno-theory: generates a steno dictionary from phonetic rules.
 //!
 //! The rules (`rules/plover.toml`) say where each sound goes on the keyboard, in Plover theory.
 //! They are judged by how many of the words Plover and Lapwing write they reproduce.
