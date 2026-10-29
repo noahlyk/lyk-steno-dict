@@ -24,3 +24,8 @@ go = "-G"    # first letter: "go" was "TKW"
 do = "-D"    # first letter: "do" was "TKO"
 was = "-Z"   # AH reduces, ending in the Z sound: "was" was "WA"
 yes = "-S"   # ends in the S sound: "yes" was "KWRE"
+
+# "one" and "won" are true homophones fighting over the one phonetically natural outline
+# ("WOPB"); "won" happened to win it, bumping "one" to a star-marked collision fallback
+# ("WUB"). Plover's own convention keeps them apart by vowel instead of leaving it to chance:
+one = "WUPB"  # "won" keeps "WOPB"; this is the same consonants with "one"'s own vowel
