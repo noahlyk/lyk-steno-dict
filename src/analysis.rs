@@ -104,6 +104,11 @@ struct Tally {
     plover_keys: f64,
     lapwing_strokes: f64,
     lapwing_keys: f64,
+    /// Same as `this_strokes`/`this_keys`, weighted by how often each word is actually said
+    /// (`Setup::count`): a word nobody says barely moves this, where it counts the same as "the"
+    /// above. Closer to what typing this theory really feels like than the per-word average is.
+    this_strokes_weighted: f64,
+    this_keys_weighted: f64,
 }
 
 /// `score`'s and `check_readme`'s shared tally: by syllable count, then "all" last.
@@ -154,6 +159,9 @@ fn tallies(setup: &Setup, briefs: &generate::Briefs, common: usize) -> Result<Ve
                 tally.this_keys += f64::from(this_keys);
                 tally.plover_strokes += plover_strokes as f64;
                 tally.plover_keys += f64::from(plover_keys);
+                let weight = setup.count.get(word).copied().unwrap_or(0) as f64;
+                tally.this_strokes_weighted += weight * this_strokes as f64;
+                tally.this_keys_weighted += weight * f64::from(this_keys);
             }
             if let Some((&(_, _), (lapwing_strokes, lapwing_keys))) = lcost {
                 tally.lapwing_strokes += lapwing_strokes as f64;
@@ -184,13 +192,14 @@ pub fn score(setup: &Setup, briefs: &generate::Briefs, common: usize) -> Result<
         "the {common} most common words that Plover or Lapwing write and CMUdict pronounces\n"
     );
     println!(
-        "syllables   words  written   plover  lapwing   either  keys/stroke: this  plover  lapwing"
+        "syllables   words  written   plover  lapwing   either  keys/stroke: this  plover  \
+         lapwing  this (by usage)"
     );
     for (label, t) in rows {
         let pct = |n: usize| format!("{:>5.1}%", 100.0 * n as f64 / t.words.max(1) as f64);
         let per_stroke = |keys: f64, strokes: f64| keys / strokes.max(1.0);
         println!(
-            "{label:<9} {:>7} {:>8} {:>8} {:>8} {:>8}  {:>17.3} {:>7.3} {:>7.3}",
+            "{label:<9} {:>7} {:>8} {:>8} {:>8} {:>8}  {:>17.3} {:>7.3} {:>7.3} {:>15.3}",
             t.words,
             pct(t.written),
             pct(t.plover),
@@ -199,6 +208,7 @@ pub fn score(setup: &Setup, briefs: &generate::Briefs, common: usize) -> Result<
             per_stroke(t.this_keys, t.this_strokes),
             per_stroke(t.plover_keys, t.plover_strokes),
             per_stroke(t.lapwing_keys, t.lapwing_strokes),
+            per_stroke(t.this_keys_weighted, t.this_strokes_weighted),
         );
     }
     Ok(())
@@ -213,9 +223,9 @@ fn score_markdown(setup: &Setup, briefs: &generate::Briefs, common: usize) -> Re
     let mut out = String::new();
     out.push_str(
         "| Syllables | Same as Plover or Lapwing | Plover | Lapwing | Keys/Stroke (this) | \
-         Keys/Stroke (Plover) | Keys/Stroke (Lapwing) |\n",
+         Keys/Stroke (Plover) | Keys/Stroke (Lapwing) | Keys/Stroke (this, by usage) |\n",
     );
-    out.push_str("|---|---|---|---|---|---|---|\n");
+    out.push_str("|---|---|---|---|---|---|---|---|\n");
     for (label, t) in &rows {
         // "0" is a handful of pronunciation-lookup artifacts (no real syllable), and "all" is
         // its own summary line; the README table is just the four real buckets.
@@ -224,13 +234,14 @@ fn score_markdown(setup: &Setup, briefs: &generate::Briefs, common: usize) -> Re
         }
         writeln!(
             out,
-            "| {label} | {} | {} | {} | {} | {} | {} |",
+            "| {label} | {} | {} | {} | {} | {} | {} | {} |",
             pct(t.either, t.words),
             pct(t.plover, t.words),
             pct(t.lapwing, t.words),
             per_stroke(t.this_keys, t.this_strokes),
             per_stroke(t.plover_keys, t.plover_strokes),
             per_stroke(t.lapwing_keys, t.lapwing_strokes),
+            per_stroke(t.this_keys_weighted, t.this_strokes_weighted),
         )?;
     }
     Ok(out)
