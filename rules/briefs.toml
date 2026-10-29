@@ -17,7 +17,6 @@ default = "plover"
 # free to give to a whole word instead. Of the ten single right-hand keys, three were already
 # spoken for this way (`-F` "of", `-B` "be", `-T` "the"); these claim the rest, each for a common
 # word that keeps its longer form as a second, ordinary outline:
-were = "-R"  # ER reduces (same rule the suffix table uses): "were" was "WR"
 up = "-P"    # AH reduces: "up" was "UP"
 all = "-L"   # ends in the L sound: "all" was "AUL"
 go = "-G"    # first letter: "go" was "TKW"
@@ -34,3 +33,17 @@ one = "WUPB"  # "won" keeps "WOPB"; this is the same consonants with "one"'s own
 # invented vowel) and was otherwise unclaimed: a free, phonetically obvious slot for a very
 # common word whose rule-generated form would otherwise be far longer.
 want = "W-T"
+
+# "were" used to hold the tenth single right-hand key, "-R", on the same reduced-ER reasoning as
+# the group above. "are" is really a coda "R" too ("AA R", not an onset one the way Plover's own
+# brief for it, bare "R", treats it) and rightfully wants "-R" for the same reason — and "are" is
+# the commoner word, so it keeps it. "were" falls back to its own rule-generated skeleton instead.
+were = "WR"  # ER reduces (same rule the suffix table uses): W, then the reduced vowel's own R
+
+# Plover's own shortest outlines for "work" and "working" (`WORB`, `WOG`) each keep only part of
+# the `-BG` pair of keys that together mean "K" on the right hand — the rest of the "work" family
+# (`worked`, `workable`, ...) already uses the full `-BG`, so these two were the odd ones out,
+# reading back as a different consonant than they're actually said with. Plover lists the
+# full-digraph form too; this just picks it instead.
+work = "WORBG"
+working = "WORBG/^-G"

@@ -81,6 +81,32 @@ pub fn shortest(outlines: &[String]) -> Option<Vec<Stroke>> {
         .min_by_key(|o| (o.len(), keys(o)))
 }
 
+/// Among a word's candidate outlines, the one a brief should actually use: fewest strokes, but
+/// preferring one whose first and last consonants read, under lyk's own rules, as the word's real
+/// first and last sounds, before falling back to fewest keys. Plover and Lapwing's own shortest
+/// outline for a word is sometimes their own theory's memorized one-off trick, not derived from
+/// either theory's general rules — which can mean only part of a two-key consonant is actually
+/// left in the stroke (`good`'s Plover brief `KPWAOD` drops the `T` of `TKPW`'s own `G`, `work`'s
+/// `WORB` drops the `G` of `-BG`'s own `K`). Picking a slightly longer candidate that reads
+/// correctly, when the word's own gold dictionary happens to offer one, is worth a few keys.
+fn best_brief(
+    outlines: &[String],
+    rules: &crate::rules::Rules,
+    word: &str,
+    sounds: &[String],
+) -> Option<Vec<Stroke>> {
+    outlines
+        .iter()
+        .filter_map(|o| parse_outline(o))
+        .min_by_key(|o| {
+            (
+                o.len(),
+                !rules.matches_real_consonants(o, word, sounds),
+                keys(o),
+            )
+        })
+}
+
 /// How many keys an outline takes to press.
 pub fn keys(outline: &[Stroke]) -> u32 {
     outline.iter().map(|s| s.0.count_ones()).sum()
@@ -185,10 +211,11 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
         if *rank >= briefs.count && !has_tiny_brief(plover) && !has_tiny_brief(lapwing) {
             continue;
         }
+        let sounds = &setup.pron[word.as_str()][0];
         let source = briefs.word.get(word.as_str()).unwrap_or(&briefs.default);
         let outline = match source.as_str() {
-            "plover" => plover.and_then(|o| shortest(o)),
-            "lapwing" => lapwing.and_then(|o| shortest(o)),
+            "plover" => plover.and_then(|o| best_brief(o, &setup.rules, word, sounds)),
+            "lapwing" => lapwing.and_then(|o| best_brief(o, &setup.rules, word, sounds)),
             explicit => parse_outline(explicit),
         };
         // A word only one of them writes still gets its brief
@@ -198,14 +225,14 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
                     .gold
                     .plover
                     .get(word.as_str())
-                    .and_then(|o| shortest(o))
+                    .and_then(|o| best_brief(o, &setup.rules, word, sounds))
             })
             .or_else(|| {
                 setup
                     .gold
                     .lapwing
                     .get(word.as_str())
-                    .and_then(|o| shortest(o))
+                    .and_then(|o| best_brief(o, &setup.rules, word, sounds))
             });
         let Some(outline) = outline else { continue };
         let text = render_outline(&outline);

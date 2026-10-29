@@ -1065,7 +1065,11 @@ impl Rules {
     }
 
     /// A run of keys as a sequence of sounds: at the lowest key still down, the entry that
-    /// starts there, covers the most keys, and (tied on that) is the fewest sounds, consumed,
+    /// starts there, covers the most keys, (tied on that) is the fewest sounds, and (tied on
+    /// that) is a plain sound rather than a spelling variant of one — a plain label and a dotted
+    /// variant can cover the exact same keys (coda `D`'s own bits are also `T`'s "-ed" spelling,
+    /// *walked* sounding like "walkt"), and without this a tie fell to whichever happened to
+    /// sort last, which is not a decision, just an accident of alphabetical order — consumed,
     /// repeated until none are left. `None` if some key is left with nothing that starts there:
     /// these keys spell no sound this theory defines.
     fn decompose(bits: u32, catalog: &[(Stroke, Vec<String>)]) -> Option<Vec<String>> {
@@ -1076,11 +1080,43 @@ impl Rules {
             let best = catalog
                 .iter()
                 .filter(|(s, _)| s.0 != 0 && s.0.trailing_zeros() == lowest && bits & s.0 == s.0)
-                .max_by_key(|(s, tokens)| (s.0.count_ones(), std::cmp::Reverse(tokens.len())))?;
+                .max_by_key(|(s, tokens)| {
+                    let plain = !tokens.iter().any(|t| t.contains('.'));
+                    (s.0.count_ones(), std::cmp::Reverse(tokens.len()), plain)
+                })?;
             out.extend(best.1.iter().cloned());
             bits &= !best.0.0;
         }
         Some(out)
+    }
+
+    /// Whether this outline's first onset and last coda actually read, under lyk's own rules, as
+    /// the word's real first and last consonant sounds. Plover and Lapwing's own shortest brief
+    /// for a word is sometimes their own theory's memorized one-off trick that leaves only part
+    /// of a key combination the rules only ever use together for one sound (`good`'s Plover brief
+    /// `KPWAOD` keeps the `P W` of `TKPW`'s own `G` but drops the `T`, which the rules read back
+    /// as "K" then "B", not "G" at all; `work`'s `WORB` keeps only the `B` of `-BG`'s own `K`,
+    /// read back as "B"). A fragment like that almost always still decodes as *some* sound, just
+    /// not the one that was meant — this checks it decodes as the right one.
+    pub fn matches_real_consonants(&self, outline: &[Stroke], word: &str, sounds: &[String]) -> bool {
+        let Some(syllables) = self.syllables(&self.label(word, sounds)) else {
+            return true;
+        };
+        let (Some(first), Some(last), Some(&first_stroke), Some(&last_stroke)) = (
+            syllables.first(),
+            syllables.last(),
+            outline.first(),
+            outline.last(),
+        ) else {
+            return true;
+        };
+        let Some(got_first) = self.resolve_stroke(first_stroke) else {
+            return false;
+        };
+        let Some(got_last) = self.resolve_stroke(last_stroke) else {
+            return false;
+        };
+        got_first.onset == first.onset && got_last.coda == last.coda
     }
 
     /// The best reading the rules can give a stroke outline: each stroke's sounds, read back
