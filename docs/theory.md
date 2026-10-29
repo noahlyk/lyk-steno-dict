@@ -10,7 +10,14 @@
    cheapest of several, and whatever its rule outline or short forms would have claimed is never
    reserved, so a later, less common word is free to take it instead — a brief can shorten a
    completely unrelated word as a side effect, since words are settled once, commonest first,
-   with nothing undone to recheck afterwards.
+   with nothing undone to recheck afterwards. Among a word's candidate outlines (Plover's,
+   Lapwing's, and any shorter variant either offers), the one picked must read back, under these
+   same rules, as the word's own first and last sound — not just the fewest keys. Plover's own
+   shortest outline is sometimes its own theory's memorized one-off trick, holding only half of a
+   two-key sound (`good`'s Plover brief `KPWAOD` keeps the `P W` of `TKPW`'s own "g" but drops the
+   `T`, reading back as "k" not "g"); a fragment like that still decodes as *some* sound under
+   these rules, just never the one meant, which is what makes it arbitrary rather than learnable.
+   Fewest keys only breaks a tie between candidates that already read back correctly.
 2. **Phonetic rules** (`rules/plover.toml`). Where each sound goes on the keyboard in Plover
    theory: consonants at the start of a syllable, the vowel, consonants at the end, and the
    clusters that fold (`NG K` is `*PBG`, `S T` is `-FT`). A vowel with an `R` of its own (`ER`,

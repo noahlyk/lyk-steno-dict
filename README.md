@@ -30,6 +30,14 @@ count — both broken out in full, along with the rest of the numbers, at
 [the bottom of this README](#full-benchmarks). Run and checked automatically
 (`score --check-readme`), not hand-typed.
 
+Lyk currently runs behind Plover here, not ahead — a real tradeoff, not a regression hidden from
+this number. A brief that only matched Plover's shortest outline by accident, not by reading back
+as the word it names, used to win purely on key count (`good`'s Plover brief keeps half of its `G`
+sound's two keys and drops the rest, `work`'s keeps a quarter of its `K`, `day`'s drops its own `D`
+entirely) — readable only by having memorized it, not by the theory's own rules. Briefs are now
+required to read back as the word under Lyk's own rules first, key count second, which cost some
+of the lead over Plover this number reports. See [the theory page](docs/theory.md) for the rule.
+
 ## Documentation
 
 The full literature lives in [`docs/`](docs/README.md) — start there for the table of contents.
@@ -155,21 +163,23 @@ Longer words differ mostly where Plover and Lapwing have a brief, and where Lyk 
 
 | | Strokes | Keys |
 |---|---|---|
-| Lyk | 1.033 | 4.019 |
-| Plover | 1.051 | 4.085 |
-| Lapwing | 1.051 | 4.164 |
+| Lyk | 1.036 | 3.945 |
+| Plover | 1.040 | 3.710 |
+| Lapwing | 1.041 | 4.106 |
 
 By how common the word is (`build` prints this), keys per word:
 
 | Words | Share of all words said | Lyk | Plover | Lapwing |
 |---|---|---|---|---|
-| top 100 | 57% | 2.81 | 2.82 | 2.91 |
-| 100 to 1,000 | 28% | 5.04 | 5.18 | 5.23 |
-| 1,000 to 5,000 | 10% | 6.14 | 6.42 | 6.52 |
-| 5,000 to 20,000 | 4% | 8.04 | 7.87 | 8.06 |
+| top 100 | 58% | 2.75 | 2.45 | 2.89 |
+| 100 to 1,000 | 28% | 4.93 | 4.81 | 5.17 |
+| 1,000 to 5,000 | 10% | 6.17 | 6.14 | 6.42 |
+| 5,000 to 20,000 | 4% | 8.02 | 7.47 | 7.88 |
+| 20,000+ | 1% | 10.13 | 8.92 | 9.30 |
 
 The top thousand words are briefs in all three, which is why the dictionaries are close: the
-rules can only move the rest.
+rules can only move the rest. As of the brief-correctness fix described above, Lyk now runs
+slightly behind Plover here, not ahead — see that note for why, and the tradeoff it was.
 
 That is with the join key on every continuation stroke counted, and with a Plover outline counted
 only when Lapwing has it too: Plover's `main.json` is full of misstrokes (`O` for *to*, `SP` for
