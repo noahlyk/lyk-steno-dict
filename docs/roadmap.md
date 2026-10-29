@@ -59,12 +59,27 @@ above the vowel-dropping alternative Phoenix uses — exactly the alternative ta
 all the way," which checks out: it causes forget/forgot-style collisions lyk's join key avoids by
 construction).
 
-What's actually worth taking:
-- **Audit lyk against their 4-way conflict taxonomy explicitly**, as a checklist: word-boundary
-  (solved), proper-noun (confirm we have a dedicated capitalization stroke), chord/stenonym (the
-  ~1,200 star-form collisions `build` already reports — audit a sample), homophonic (currently
-  orthographic via spelling rules — confirm that stays deliberate, not ad hoc, as the dictionary
-  grows).
+**Conflict-taxonomy audit — done, 2026-10-29:**
+- **Word-boundary** — solved by construction, the join key (rule 1 of this section).
+- **Proper-noun** — handled, via command strokes, not a dedicated outline shape: the deployed
+  punctuation dictionary (`03-lyk-punctuation.json`) already carries `KPA`/`KPA*` → `{-|}`
+  (capitalize the next word), fired before a name the same way Plover's own convention works.
+  lyk itself generates no proper-noun outlines of its own — names type as whatever their ordinary
+  phonetic outline would be, capitalized by that stroke. Not a gap, just worth having written down.
+- **Chord/stenonym** (two different words landing on the identical outline) — handled by the star
+  ladder (`theory.md` rule 6): commonest word keeps the plain outline, the rest take a star on the
+  first stroke, then the last, then two star strokes. ~1,200 words currently use a star form
+  (`README.md`'s full benchmarks section). Working as designed, not audited word-by-word here —
+  no reason found to think it needs to be.
+- **Homophonic** — handled orthographically, by spelling rules (`theory.md` rule 3: `sail`/`sale`,
+  `ea`/`ee`, `oa`/`o-e`, `air`/`are`), exactly the structural fix the article's taxonomy
+  recommends over leaving it to per-word judgment. Already the deliberate approach, confirmed.
+
+All four hold up. The one genuine finding from this pass was unrelated to the taxonomy itself: the
+orthographic fallback's bare-`AO` tie-break (section 1 above) was picking the least likely of three
+colliding readings — fixed (see `3822e12`).
+
+Two other ideas from the same reading, still worth keeping in mind:
 - **Pseudo-strokes**: a named technique for splitting one hard-to-encode coda cluster into an
   onset-equivalent + coda-equivalent half within a single stroke. Relevant only if/when
   `[coda]`/`[coda_cluster]` in `rules/plover.toml` get expanded toward the denser cluster tables
