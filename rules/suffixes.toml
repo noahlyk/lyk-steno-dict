@@ -1,0 +1,41 @@
+# Standalone suffix strokes: a continuation stroke (join key down) that stands for a suffix on
+# its own, the way Plover's own bundled suffix dictionary does, so one can be added to any stem
+# — not only the ones the generator happened to fold one onto while building a specific word.
+#
+# Every key here is the same continuation-stroke mechanism `rules/plover.toml`'s `[coda]` and
+# `[coda_cluster]` already use when a word's own reduced final syllable folds onto a stroke of
+# its own (see the README, "Several syllables"): the suffix's consonants, reduced vowel dropped,
+# written on the right hand in steno order. That keeps a suffix struck on its own identical to
+# the stroke a whole word already ends in, so the two reinforce the same muscle memory instead of
+# teaching a second, unrelated one.
+#
+# Only suffixes whose vowel genuinely reduces to nothing in ordinary speech are here: one that
+# keeps a real vowel (`-tion`'s -GS is the schwa-dropped SH-N; `-ous`, `-ive`, `-ism`, `-ship`,
+# `-hood`, `-ward` do not reduce this far) needs a stroke with a vowel of its own, which is a
+# different, not yet built, part of this table.
+
+"^-G" = "ing"
+"^-D" = "ed"
+"^-S" = "s"
+"^-L" = "ly"
+"^-R" = "er"
+"^-PB" = "en"
+"^-FT" = "est"
+"^-PBS" = "ness"
+"^-PLT" = "ment"
+"^-GS" = "tion"
+"^-BL" = "able"
+
+# Added past the original set above: still a plain union of `[coda]` entries already in
+# `rules/plover.toml`, never a new key combination invented for this file.
+"^-FL" = "ful"      # F, L: "care-ful"
+"^-LS" = "less"     # L, S: "care-less"
+"^-PBT" = "ent"     # N, T: "pay-ment" is -PLT above; this is the "differ-ent" ending
+"^-LT" = "let"      # L, T: "book-let", "pig-let"
+"^-Z" = "s"          # the voiced "-s" ("dogs"), same written suffix as "^-S", a second stroke
+                      # for whichever sound the word actually ends in
+"^*T" = "th"        # TH coda, `rules/plover.toml`'s `*T`: "wid-th", "warm-th", "four-th"
+
+# "-some" ("awe-some", "lone-some"): S then M reduced is the "S M" -> "-FPL" cluster
+# `rules/plover.toml` already has for Plover's own F-insertion convention (`lesson` HR-FPB).
+"^-FPL" = "some"

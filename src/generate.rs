@@ -10,6 +10,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
 
 const BUILT_IN_BRIEFS: &str = include_str!("../rules/briefs.toml");
+const BUILT_IN_SUFFIXES: &str = include_str!("../rules/suffixes.toml");
 
 /// A brief this short was hand-picked by a theory's authors, not derived from frequency: see
 /// [`generate`].
@@ -44,6 +45,9 @@ impl Briefs {
 /// How a dictionary entry came about.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Origin {
+    /// A standalone suffix: a continuation stroke that stands for it on its own, not folded onto
+    /// any particular word (see `rules/suffixes.toml`)
+    Suffix,
     Brief,
     Rules,
     /// A long word written shorter by one of the shortening steps
@@ -115,6 +119,26 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
     let mut taken: HashMap<String, String> = HashMap::new();
     let mut entries: Vec<Entry> = Vec::new();
     let mut pinned: HashSet<String> = HashSet::new();
+
+    // Standalone suffixes, first of all: a word that would otherwise land on the same outline
+    // as one of these loses to it, the same way a brief does, since a suffix is struck on its
+    // own far more often than any one rare word would want that exact outline.
+    let suffixes: BTreeMap<String, String> = toml::from_str(BUILT_IN_SUFFIXES)?;
+    for (outline_text, word) in &suffixes {
+        let outline = parse_outline(outline_text)
+            .with_context(|| format!("{outline_text:?} in rules/suffixes.toml"))?;
+        let text = render_outline(&outline);
+        if let Some(holder) = taken.get(&text) {
+            anyhow::bail!("suffix {word:?} wants the outline {holder:?} already has");
+        }
+        taken.insert(text, word.clone());
+        entries.push(Entry {
+            word: word.clone(),
+            outline,
+            origin: Origin::Suffix,
+            lost_to: None,
+        });
+    }
 
     // Words, most common first
     let mut words: Vec<(&String, usize)> = setup

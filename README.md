@@ -32,10 +32,19 @@ written in Rust, with the rules as data. American English only.
    *lately* HRAEULT, *color* KORL). When they don't fit, the stem keeps the consonant it owns
    and the rest is a continuation stroke of consonants only on the right hand: *ended* EPBD/^-D,
    *breaking* PWRAEUBG/^-G, *goodness* TKPWAOD/^-PBS, *harder* HARD/^-R, *confidence*
-   KOPB/^-FD/^-PBS. So the suffixes are a small fixed set that never needs memorising apart
-   from the rules: `^-G` ing, `^-D` ed, `^-S` s, `^-L` ly, `^-R` er, `^-PB` en, `^-FT` est,
-   `^-PBS` ness, `^-PLT` ment, `^-GS` tion, `^-BL` able. A join stroke carries a vowel only
-   when the suffix has no consonant. Final `-ly` is `^PHREU` after a cluster and a double `l`
+   KOPB/^-FD/^-PBS. So the suffixes words fold onto are a fixed set that never needs memorising
+   apart from the rules, and `rules/suffixes.toml` gives every one of them a stroke on its own
+   too, Plover-suffix-dictionary style, so it can be added to a stem that never happened to need
+   it while the dictionary was built: `^-G` ing, `^-D` ed, `^-S`/`^-Z` s (whichever the word
+   actually ends in), `^-L` ly, `^-R` er, `^-PB` en, `^-FT` est, `^-PBS` ness, `^-PLT` ment,
+   `^-GS` tion, `^-BL` able, `^-FL` ful, `^-LS` less, `^-PBT` ent, `^-LT` let, `^-FPL` some,
+   `^*T` th. Each is the same plain union of `rules/plover.toml`'s own coda keys a word's own
+   ending would use, nothing invented for the suffix alone, so it is the same stroke whichever
+   put it there. A suffix with a real vowel that never reduces away (`-tive`, `-ous`, `-ism`,
+   `-ship`, `-hood`, `-ward`) is not here yet: that needs a stroke built the way a stressed
+   syllable is, not a bare continuation of consonants, and is further work. A join stroke
+   carries a vowel only when the suffix has no consonant. Final `-ly` is `^PHREU` after a
+   cluster and a double `l`
    (*silly* SEUL/^EU); any other final `y` is `^EU`, and a final `a` is a
    syllable of its own (*china* KHAOEU/^TPHA). Suffix clusters both dictionaries use are rules:
    `-ment` -PLT, `-tion` -GS, `-ting` -GT, `-ding` -GD, and Plover's F for an S before another
