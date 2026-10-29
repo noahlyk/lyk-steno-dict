@@ -1271,8 +1271,9 @@ fn default_spelling(sound: &str) -> &str {{
 }}
 
 /// A run of keys as a sequence of sounds: at the lowest key still down, the entry that starts
-/// there, covers the most keys, and (tied on that) is the fewest sounds, consumed, repeated
-/// until none are left. `None` if some key is left with nothing that starts there.
+/// there, covers the most keys, (tied on that) is the fewest sounds, and (tied on that) is a
+/// plain sound rather than a spelling variant of one, consumed, repeated until none are left.
+/// `None` if some key is left with nothing that starts there.
 fn decompose(bits: u32, catalog: &[(u32, &[&str])]) -> Option<Vec<String>> {{
     let mut bits = bits;
     let mut out = Vec::new();
@@ -1281,7 +1282,10 @@ fn decompose(bits: u32, catalog: &[(u32, &[&str])]) -> Option<Vec<String>> {{
         let best = catalog
             .iter()
             .filter(|(s, _)| *s != 0 && s.trailing_zeros() == lowest && bits & s == *s)
-            .max_by_key(|(s, tokens)| (s.count_ones(), std::cmp::Reverse(tokens.len())))?;
+            .max_by_key(|(s, tokens)| {{
+                let plain = !tokens.iter().any(|t| t.contains('.'));
+                (s.count_ones(), std::cmp::Reverse(tokens.len()), plain)
+            }})?;
         out.extend(best.1.iter().map(ToString::to_string));
         bits &= !best.0;
     }}
