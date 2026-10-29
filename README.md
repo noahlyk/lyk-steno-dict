@@ -16,21 +16,32 @@ write 99.9% of them, and write the word the way Plover or Lapwing does (ignoring
 the `KWR` or star they put on a continuation stroke, which the join key replaces) for:
 
 <!-- lyk:score-table:start -->
-| Syllables | Same as Plover or Lapwing | Plover | Lapwing | Keys/Stroke (this) | Keys/Stroke (Plover) | Keys/Stroke (Lapwing) | Keys/Stroke (this, by usage) |
-|---|---|---|---|---|---|---|---|
-| 1 | 90% | 78% | 83% | 5.72 | 5.66 | 5.83 | 3.09 |
-| 2 | 60% | 45% | 52% | 5.68 | 4.93 | 5.27 | 4.93 |
-| 3 | 39% | 26% | 33% | 5.29 | 4.80 | 5.15 | 4.97 |
-| 4+ | 24% | 17% | 19% | 5.30 | 4.97 | 5.22 | 5.18 |
+| Syllables | Same as Plover or Lapwing | Plover | Lapwing | Keys/Stroke (this) | Keys/Stroke (Plover) | Keys/Stroke (Lapwing) |
+|---|---|---|---|---|---|---|
+| 1 | 90% | 78% | 83% | 5.72 | 5.66 | 5.83 |
+| 2 | 60% | 45% | 52% | 5.68 | 4.93 | 5.27 |
+| 3 | 39% | 26% | 33% | 5.29 | 4.80 | 5.15 |
+| 4+ | 24% | 17% | 19% | 5.30 | 4.97 | 5.22 |
 <!-- lyk:score-table:end -->
 
-The last column weighs lyk's keys/stroke by how often each word is actually said, instead of
-counting every distinct word once regardless of how rare it is — one-syllable words drop sharply
-under this weighting (5.72 unweighted vs. 3.09 by usage) because a handful of extremely common
-short words ("the", "a", "to", "of"...) dominate real typing far more than the long tail of rare
-one-syllable words. This is run and checked automatically (`score --check-readme`), not hand-typed
-— see [the full benchmarks page](docs/benchmarks.md) for the rest: strokes/keys per word, cost by
-how common a word is, and the caveats behind these numbers.
+The same keys/stroke figure, weighted by how often each word is actually said instead of counting
+every distinct word once regardless of how rare it is, for all three theories side by side:
+
+<!-- lyk:usage-table:start -->
+| Syllables | Keys/Stroke (this, by usage) | Keys/Stroke (Plover, by usage) | Keys/Stroke (Lapwing, by usage) |
+|---|---|---|---|
+| 1 | 3.09 | 3.16 | 3.58 |
+| 2 | 4.93 | 4.70 | 5.00 |
+| 3 | 4.97 | 4.93 | 5.25 |
+| 4+ | 5.18 | 5.24 | 5.50 |
+<!-- lyk:usage-table:end -->
+
+One-syllable words drop sharply under this weighting for every theory, not just lyk, because a
+handful of extremely common short words ("the", "a", "to", "of"...) dominate real typing far more
+than the long tail of rare one-syllable words. Both tables are run and checked automatically
+(`score --check-readme`), not hand-typed — see [the full benchmarks page](docs/benchmarks.md) for
+the rest: strokes/keys per word, cost by how common a word is, and the caveats behind these
+numbers.
 
 ## Documentation
 
