@@ -102,6 +102,8 @@ struct Tally {
     this_keys: f64,
     plover_strokes: f64,
     plover_keys: f64,
+    lapwing_strokes: f64,
+    lapwing_keys: f64,
 }
 
 /// `score`'s and `check_readme`'s shared tally: by syllable count, then "all" last.
@@ -119,6 +121,10 @@ fn tallies(setup: &Setup, briefs: &generate::Briefs, common: usize) -> Result<Ve
         let outline = generate::shortest(setup.gold.plover.get(word)?)?;
         Some((outline.len(), generate::keys(&outline)))
     };
+    let lapwing_cost = |word: &str| -> Option<(usize, u32)> {
+        let outline = generate::shortest(setup.gold.lapwing.get(word)?)?;
+        Some((outline.len(), generate::keys(&outline)))
+    };
 
     let mut by_size: BTreeMap<usize, Tally> = BTreeMap::new();
     let mut total = Tally::default();
@@ -134,6 +140,7 @@ fn tallies(setup: &Setup, briefs: &generate::Briefs, common: usize) -> Result<Ve
             lapwing |= l;
         }
         let cost = ours.get(word).zip(plover_cost(word));
+        let lcost = ours.get(word).zip(lapwing_cost(word));
         let size = setup.syllable_count(word).min(4);
         for tally in [by_size.entry(size).or_default(), &mut total] {
             tally.words += 1;
@@ -147,6 +154,10 @@ fn tallies(setup: &Setup, briefs: &generate::Briefs, common: usize) -> Result<Ve
                 tally.this_keys += f64::from(this_keys);
                 tally.plover_strokes += plover_strokes as f64;
                 tally.plover_keys += f64::from(plover_keys);
+            }
+            if let Some((&(_, _), (lapwing_strokes, lapwing_keys))) = lcost {
+                tally.lapwing_strokes += lapwing_strokes as f64;
+                tally.lapwing_keys += f64::from(lapwing_keys);
             }
         }
     }
@@ -166,18 +177,20 @@ fn tallies(setup: &Setup, briefs: &generate::Briefs, common: usize) -> Result<Ve
 }
 
 /// How many of the words the rules write the way Plover and Lapwing do, by syllables, and how
-/// many keys each syllable count takes per stroke, lyk next to Plover.
+/// many keys each syllable count takes per stroke, lyk next to Plover and Lapwing.
 pub fn score(setup: &Setup, briefs: &generate::Briefs, common: usize) -> Result<()> {
     let rows = tallies(setup, briefs, common)?;
     println!(
         "the {common} most common words that Plover or Lapwing write and CMUdict pronounces\n"
     );
-    println!("syllables   words  written   plover  lapwing   either  keys/stroke: this  plover");
+    println!(
+        "syllables   words  written   plover  lapwing   either  keys/stroke: this  plover  lapwing"
+    );
     for (label, t) in rows {
         let pct = |n: usize| format!("{:>5.1}%", 100.0 * n as f64 / t.words.max(1) as f64);
         let per_stroke = |keys: f64, strokes: f64| keys / strokes.max(1.0);
         println!(
-            "{label:<9} {:>7} {:>8} {:>8} {:>8} {:>8}  {:>17.3} {:>7.3}",
+            "{label:<9} {:>7} {:>8} {:>8} {:>8} {:>8}  {:>17.3} {:>7.3} {:>7.3}",
             t.words,
             pct(t.written),
             pct(t.plover),
@@ -185,6 +198,7 @@ pub fn score(setup: &Setup, briefs: &generate::Briefs, common: usize) -> Result<
             pct(t.either),
             per_stroke(t.this_keys, t.this_strokes),
             per_stroke(t.plover_keys, t.plover_strokes),
+            per_stroke(t.lapwing_keys, t.lapwing_strokes),
         );
     }
     Ok(())
@@ -197,8 +211,11 @@ fn score_markdown(setup: &Setup, briefs: &generate::Briefs, common: usize) -> Re
     let pct = |n: usize, of: usize| format!("{:.0}%", 100.0 * n as f64 / of.max(1) as f64);
     let per_stroke = |keys: f64, strokes: f64| format!("{:.2}", keys / strokes.max(1.0));
     let mut out = String::new();
-    out.push_str("| Syllables | Same as Plover or Lapwing | Plover | Lapwing | Keys/Stroke (this) | Keys/Stroke (Plover) |\n");
-    out.push_str("|---|---|---|---|---|---|\n");
+    out.push_str(
+        "| Syllables | Same as Plover or Lapwing | Plover | Lapwing | Keys/Stroke (this) | \
+         Keys/Stroke (Plover) | Keys/Stroke (Lapwing) |\n",
+    );
+    out.push_str("|---|---|---|---|---|---|---|\n");
     for (label, t) in &rows {
         // "0" is a handful of pronunciation-lookup artifacts (no real syllable), and "all" is
         // its own summary line; the README table is just the four real buckets.
@@ -207,12 +224,13 @@ fn score_markdown(setup: &Setup, briefs: &generate::Briefs, common: usize) -> Re
         }
         writeln!(
             out,
-            "| {label} | {} | {} | {} | {} | {} |",
+            "| {label} | {} | {} | {} | {} | {} | {} |",
             pct(t.either, t.words),
             pct(t.plover, t.words),
             pct(t.lapwing, t.words),
             per_stroke(t.this_keys, t.this_strokes),
             per_stroke(t.plover_keys, t.plover_strokes),
+            per_stroke(t.lapwing_keys, t.lapwing_strokes),
         )?;
     }
     Ok(out)

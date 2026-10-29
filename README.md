@@ -84,17 +84,18 @@ write 99.9% of them, and write the word the way Plover or Lapwing does (ignoring
 the `KWR` or star they put on a continuation stroke, which the join key replaces) for:
 
 <!-- lyk:score-table:start -->
-| Syllables | Same as Plover or Lapwing | Plover | Lapwing | Keys/Stroke (this) | Keys/Stroke (Plover) |
-|---|---|---|---|---|---|
-| 1 | 90% | 78% | 83% | 5.70 | 5.66 |
-| 2 | 60% | 45% | 52% | 5.68 | 4.93 |
-| 3 | 39% | 26% | 33% | 5.29 | 4.80 |
-| 4+ | 24% | 17% | 19% | 5.29 | 4.97 |
+| Syllables | Same as Plover or Lapwing | Plover | Lapwing | Keys/Stroke (this) | Keys/Stroke (Plover) | Keys/Stroke (Lapwing) |
+|---|---|---|---|---|---|---|
+| 1 | 90% | 78% | 83% | 5.70 | 5.66 | 5.83 |
+| 2 | 60% | 45% | 52% | 5.68 | 4.93 | 5.27 |
+| 3 | 39% | 26% | 33% | 5.29 | 4.80 | 5.15 |
+| 4+ | 24% | 17% | 19% | 5.29 | 4.97 | 5.22 |
 <!-- lyk:score-table:end -->
 
-The last two columns are keys pressed per stroke, lyk next to Plover, on the words both write
-(`score` prints this; `score --check-readme` checks this table is still what it would print, so
-it can be re-run after a dictionary change instead of trusted to stay accurate by hand). Lower is
+The last three columns are keys pressed per stroke, lyk next to Plover and Lapwing, on the words
+each pair both write (`score` prints this; `score --check-readme` checks this table is still what
+it would print, so it can be re-run after a dictionary change instead of trusted to stay accurate
+by hand). Lower is
 not automatically better here — it says how much a stroke is doing, not how short the word comes
 out — but a stroke-count difference between two theories tends to show up here too, since more
 strokes for the same word usually means each one is doing less.
