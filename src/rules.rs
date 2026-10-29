@@ -318,6 +318,15 @@ fn vowelless(mut syllable: Syllable, written: Stroke) -> Syllable {
     syllable
 }
 
+/// How a vowel label sorts when two share a physical stroke: lowest wins the stroke's reverse
+/// reading. A plain sound normally beats a spelling variant, except `UH` ("book", "put"), which
+/// is rarer in practice than the `UW.oo` ("too", "-oo" endings like "kangaroo") and `OW.oa`
+/// ("boat") variants it happens to share bare `AO` with — ranking it first like any other plain
+/// sound would make the fallback's best guess for that stroke the least likely reading.
+fn vowel_rank(s: &str) -> (bool, &str) {
+    (!s.contains('.') && s != "UH", s)
+}
+
 /// A sound without its spelling variant but with its stress: `UW.oo1` is `UW1`.
 fn unlabelled(sound: &str) -> String {
     let stress: String = sound.chars().filter(char::is_ascii_digit).collect();
@@ -350,14 +359,11 @@ impl Rules {
         onset_rev.extend(invert(&onset_cluster));
         let mut coda_rev = invert(&coda);
         coda_rev.extend(invert(&coda_cluster));
-        // When two labels share the same vowel keys (`AE` and the spelling variant `AA.a` are
-        // both just `A`), the plain sound wins, deterministically, over a spelling variant
+        // When two labels share the same vowel keys, deterministically pick which one wins the
+        // reverse reading: see `vowel_rank`.
         let mut vowel_pairs: Vec<(Stroke, String)> =
             vowel.iter().map(|(s, &k)| (k, s.clone())).collect();
-        vowel_pairs.sort_by(|a, b| {
-            let plain_first = |s: &str| !s.contains('.');
-            (plain_first(&a.1), &a.1).cmp(&(plain_first(&b.1), &b.1))
-        });
+        vowel_pairs.sort_by(|a, b| vowel_rank(&a.1).cmp(&vowel_rank(&b.1)));
         let vowel_rev: HashMap<Stroke, String> = vowel_pairs.into_iter().collect();
         let mut vowel_coda_rev: Vec<(Stroke, String, String)> = vowel_coda
             .iter()

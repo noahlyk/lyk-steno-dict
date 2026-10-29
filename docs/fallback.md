@@ -34,9 +34,18 @@ matching what you meant.
 
 ```
 cargo run --release -- resolve STKPW        # a stroke not in the dictionary, read back
-cargo run --release -- resolve -- "-T/^AO"  # "tuh" — AO is "uh", not "oo"
+cargo run --release -- resolve -- "-T/^AO"  # "too" — see below for why, not "AOU"'s own "too"
 cargo run --release -- resolve -- "-T/^AOU" # "too"
 ```
+
+Bare `AO` is a three-way collision, not a clean pair: it's the stroke for the plain vowel of
+"book"/"put" (`UH`), *and* the "-oo" spelling of "too"/"moon"/words ending "-oo" like "kangaroo"
+(`UW.oo`), *and* the "-oa" spelling of "boat" (`OW.oa`). A real word's full pronunciation and
+spelling tell these apart when the dictionary is built; a miss has no word to go on, so `resolve`
+has to pick one reading for the stroke alone, every time, the same way. It picks `UW.oo` over the
+other two — not because "book"'s vowel is rare in general, but because it's rare specifically as
+an unreduced vowel landing on a *continuation* stroke, where "-oo" endings are common. See
+`vowel_rank` in `src/rules.rs` for the exact tie-break and why.
 
 ## As a real steno engine's last resort
 
