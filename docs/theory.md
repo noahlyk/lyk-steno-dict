@@ -23,9 +23,14 @@
    one sound. Plover's own shortest outline is sometimes exactly that: a fragment of its own
    theory's multi-key sound, not a clean shortcut (`good`'s Plover brief `KPWAOD` keeps the `P W`
    of `TKPW`'s own "g" but drops the `T`, which these rules read back as "k", not "g" — a
-   different, wrong sound, not just an unrelated memorized one). That fragment is rejected in
-   favor of the next candidate that either uses the whole cluster or none of it at all; fewest
-   keys then picks among whichever candidates are left.
+   different, wrong sound, not just an unrelated memorized one). That fragment is rejected, and
+   two repairs are generated alongside the original candidates to replace it: completing the
+   fragment into the whole, correct cluster, or dropping it outright, since a brief is always
+   free to skip a sound it isn't attempting at all. Dropping is usually fewer keys, so it's what
+   wins when it's available (`good`'s brief is `AOD` — no attempt at its "g" sound at all, rather
+   than the seven-key `TKPWAOD` completing it) — but either repair only exists because the word's
+   own gold dictionary pointed at that sound to begin with; nothing is invented from nothing.
+   Fewest keys then picks among whichever candidates, original or repaired, are left.
 3. **Phonetic rules** (`rules/plover.toml`). Where each sound goes on the keyboard in Plover
    theory: consonants at the start of a syllable, the vowel, consonants at the end, and the
    clusters that fold (`NG K` is `*PBG`, `S T` is `-FT`). A vowel with an `R` of its own (`ER`,

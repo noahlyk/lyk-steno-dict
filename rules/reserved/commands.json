@@ -15,6 +15,7 @@
 "TPW-R": "{#Alt_L(Left)}",
 "TPW-G": "{#Alt_L(Right)}",
 "TPEFBG": "{#Escape}",
+"EFBG": "{#Escape}",
 "TA*B": "{#Tab}{^}",
 "TA*BT": "{#Alt_L(Tab Tab)}",
 "KPH*F": "{#Super_L(v)}",

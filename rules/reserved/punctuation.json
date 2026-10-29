@@ -99,6 +99,7 @@
   "SKW-TS": "{'^}",
   "SKWA*EURD": "{^\u00b2}",
   "SKWR*RBGS": "{;}",
+  "SP": "{^ ^}",
   "SP*S": "{^ ^}",
   "SP-PT": "{;}",
   "SPWHRAERB": "{^\\^}",

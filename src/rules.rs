@@ -1095,7 +1095,7 @@ impl Rules {
     /// unrelated memorized key, not a fragment of anything); full overlap is fine (the sound is
     /// there, whole, however many other keys ride along with it); only a partial hit means a key
     /// combination this one sound needs *together* shows up with a piece of it missing.
-    fn fragments(bits: u32, target: Stroke) -> bool {
+    const fn fragments(bits: u32, target: Stroke) -> bool {
         target.0.count_ones() > 1 && bits & target.0 != 0 && bits & target.0 != target.0
     }
 
