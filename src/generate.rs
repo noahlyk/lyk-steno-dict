@@ -140,6 +140,23 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
         });
     }
 
+    // The pronoun "I": the frequency list only ever has it lowercase, indistinguishable from
+    // the letter name "i" ("spell that: i, c, e"), and the letter already won that one word's
+    // only slot (see the single-letter carve-out below). A capitalized word needs an entry of
+    // its own regardless, so it gets one directly, on Plover's own real convention for it.
+    let outline = parse_outline("EU").context("\"EU\" for the pronoun \"I\"")?;
+    let text = render_outline(&outline);
+    if let Some(holder) = taken.get(&text) {
+        anyhow::bail!("the pronoun \"I\" wants the outline {text:?} {holder:?} already has");
+    }
+    taken.insert(text, "I".to_string());
+    entries.push(Entry {
+        word: "I".to_string(),
+        outline,
+        origin: Origin::Brief,
+        lost_to: None,
+    });
+
     // Words, most common first
     let mut words: Vec<(&String, usize)> = setup
         .rank
