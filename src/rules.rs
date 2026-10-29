@@ -1141,6 +1141,47 @@ impl Rules {
             && no_fragment(&last.coda, coda_bits, &self.coda, &self.coda_cluster)
     }
 
+    /// The bits of `bits` that are a fragment of one of `tokens`' own multi-key sounds — the part
+    /// [`Self::matches_real_consonants`] rejects a candidate for holding.
+    fn fragment_bits(tokens: &[String], bits: u32, table: &HashMap<String, Stroke>, cluster: &HashMap<String, Stroke>) -> u32 {
+        tokens
+            .iter()
+            .filter_map(|t| Self::token_bits(t, table, cluster))
+            .filter(|target| Self::fragments(bits, *target))
+            .fold(0, |acc, target| acc | (bits & target.0))
+    }
+
+    /// A shorter, equally legitimate alternative to completing a fragment: drop it instead. A
+    /// brief is always free to leave out a whole sound it isn't attempting to represent (`it` on
+    /// the bare onset `T`, nothing of "it"'s own first sound at all, is exactly as fine as ever);
+    /// what [`Self::matches_real_consonants`] rejects is holding only *part* of a sound's own key
+    /// combination. Completing the fragment (the fallback already in place) and removing it
+    /// outright are both ways to stop holding only part of it — removing is usually fewer keys,
+    /// so this is offered as a second candidate alongside the word's full, correct outline, and
+    /// the normal cheapest-and-correct selection picks whichever one is both. `None` if there is
+    /// no fragment to drop, or dropping it would leave a stroke with no keys down at all.
+    pub fn drop_fragments(&self, outline: &[Stroke], word: &str, sounds: &[String]) -> Option<Vec<Stroke>> {
+        let syllables = self.syllables(&self.label(word, sounds))?;
+        let (first, last, &first_stroke, &last_stroke) = (
+            syllables.first()?,
+            syllables.last()?,
+            outline.first()?,
+            outline.last()?,
+        );
+        let onset_bits = first_stroke.0 & Stroke::LEFT;
+        let coda_bits = last_stroke.0 & (Stroke::RIGHT | Stroke::STAR);
+        let onset_fragment = Self::fragment_bits(&first.onset, onset_bits, &self.onset, &self.onset_cluster);
+        let coda_fragment = Self::fragment_bits(&last.coda, coda_bits, &self.coda, &self.coda_cluster);
+        if onset_fragment == 0 && coda_fragment == 0 {
+            return None;
+        }
+        let mut out = outline.to_vec();
+        let last_index = out.len() - 1;
+        out[0] = Stroke(out[0].0 & !onset_fragment);
+        out[last_index] = Stroke(out[last_index].0 & !coda_fragment);
+        (out[0].0 != 0 && out[last_index].0 != 0).then_some(out)
+    }
+
     /// The best reading the rules can give a stroke outline: each stroke's sounds, read back
     /// and spelled plainly (not real orthography, just enough to read), continuation strokes
     /// run on and others started with a space. `None` only once some stroke in it cannot be

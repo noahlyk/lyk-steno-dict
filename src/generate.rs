@@ -99,17 +99,29 @@ pub fn shortest(outlines: &[String]) -> Option<Vec<Stroke>> {
 /// outline for a word is sometimes their own theory's memorized one-off trick, not derived from
 /// either theory's general rules — which can mean only part of a two-key consonant is actually
 /// left in the stroke (`good`'s Plover brief `KPWAOD` drops the `T` of `TKPW`'s own `G`, `work`'s
-/// `WORB` drops the `G` of `-BG`'s own `K`). Picking a slightly longer candidate that reads
-/// correctly, when the word's own gold dictionary happens to offer one, is worth a few keys.
+/// `WORB` drops the `G` of `-BG`'s own `K`). Where that happens, two repairs are tried alongside
+/// the original candidates, not just one: completing the fragment into the word's whole, correct
+/// sound (what used to be the only fallback), and dropping the fragment outright, since a brief
+/// is always free to leave out a sound it isn't attempting at all — only holding *part* of one is
+/// disallowed. Dropping is usually the fewer keys of the two, so it's what wins when it's free;
+/// both are only ever offered when the word's own gold dictionary pointed at the sound to begin
+/// with, never invented from nothing.
 fn best_brief(
     outlines: &[String],
     rules: &crate::rules::Rules,
     word: &str,
     sounds: &[String],
 ) -> Option<Vec<Stroke>> {
-    outlines
+    let candidates: Vec<Vec<Stroke>> = outlines
         .iter()
         .filter_map(|o| parse_outline(o))
+        .flat_map(|o| {
+            let repaired = rules.drop_fragments(&o, word, sounds);
+            std::iter::once(o).chain(repaired)
+        })
+        .collect();
+    candidates
+        .into_iter()
         .min_by_key(|o| {
             (
                 o.len(),
