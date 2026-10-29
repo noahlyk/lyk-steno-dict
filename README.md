@@ -9,6 +9,29 @@ This program generates the dictionary (Plover JSON) from phonetic rules, startin
 and Lapwing already do and measured against them. Inspired by [Froj](https://github.com/StenoHarri/Froj);
 written in Rust, with the rules as data. American English only.
 
+## Where lyk stands
+
+On the 100,000 most common words that Plover or Lapwing write and CMUdict pronounces, the rules
+write 99.9% of them, and write the word the way Plover or Lapwing does (ignoring the join key and
+the `KWR` or star they put on a continuation stroke, which the join key replaces) for:
+
+<!-- lyk:score-table:start -->
+| Syllables | Same as Plover or Lapwing | Plover | Lapwing | Keys/Stroke (this) | Keys/Stroke (Plover) | Keys/Stroke (Lapwing) | Keys/Stroke (this, by usage) |
+|---|---|---|---|---|---|---|---|
+| 1 | 90% | 78% | 83% | 5.72 | 5.66 | 5.83 | 3.09 |
+| 2 | 60% | 45% | 52% | 5.68 | 4.93 | 5.27 | 4.93 |
+| 3 | 39% | 26% | 33% | 5.29 | 4.80 | 5.15 | 4.97 |
+| 4+ | 24% | 17% | 19% | 5.30 | 4.97 | 5.22 | 5.18 |
+<!-- lyk:score-table:end -->
+
+The last column weighs lyk's keys/stroke by how often each word is actually said, instead of
+counting every distinct word once regardless of how rare it is — one-syllable words drop sharply
+under this weighting (5.72 unweighted vs. 3.09 by usage) because a handful of extremely common
+short words ("the", "a", "to", "of"...) dominate real typing far more than the long tail of rare
+one-syllable words. This is run and checked automatically (`score --check-readme`), not hand-typed
+— see [the full benchmarks page](docs/benchmarks.md) for the rest: strokes/keys per word, cost by
+how common a word is, and the caveats behind these numbers.
+
 ## Documentation
 
 The full literature lives in [`docs/`](docs/README.md) — start there for the table of contents.
