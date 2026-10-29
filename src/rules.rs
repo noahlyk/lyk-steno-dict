@@ -1090,14 +1090,33 @@ impl Rules {
         Some(out)
     }
 
-    /// Whether this outline's first onset and last coda actually read, under lyk's own rules, as
-    /// the word's real first and last consonant sounds. Plover and Lapwing's own shortest brief
-    /// for a word is sometimes their own theory's memorized one-off trick that leaves only part
-    /// of a key combination the rules only ever use together for one sound (`good`'s Plover brief
-    /// `KPWAOD` keeps the `P W` of `TKPW`'s own `G` but drops the `T`, which the rules read back
-    /// as "K" then "B", not "G" at all; `work`'s `WORB` keeps only the `B` of `-BG`'s own `K`,
-    /// read back as "B"). A fragment like that almost always still decodes as *some* sound, just
-    /// not the one that was meant — this checks it decodes as the right one.
+    /// Whether `bits` holds only part of `target`'s own keys: some of them down, but not all.
+    /// Zero overlap is fine (the candidate isn't trying to be this sound at all, which is just an
+    /// unrelated memorized key, not a fragment of anything); full overlap is fine (the sound is
+    /// there, whole, however many other keys ride along with it); only a partial hit means a key
+    /// combination this one sound needs *together* shows up with a piece of it missing.
+    fn fragments(bits: u32, target: Stroke) -> bool {
+        target.0.count_ones() > 1 && bits & target.0 != 0 && bits & target.0 != target.0
+    }
+
+    /// The keys a sound token is written with, checking the plain table first and the cluster
+    /// table (`[onset_cluster]`/`[coda_cluster]`, built from more than one sound together) next.
+    fn token_bits(token: &str, table: &HashMap<String, Stroke>, cluster: &HashMap<String, Stroke>) -> Option<Stroke> {
+        table.get(token).or_else(|| cluster.get(token)).copied()
+    }
+
+    /// Whether this outline's first onset and last coda are each a whole key or cluster toward
+    /// the word's own real first and last sound, never half of one. Plover and Lapwing's own
+    /// shortest brief for a word is sometimes their own theory's memorized one-off trick that
+    /// leaves only part of a key combination the rules only ever use together for *that* sound
+    /// (`good`'s Plover brief `KPWAOD` keeps the `P W` of `TKPW`'s own `G` but drops the `T`;
+    /// `work`'s `WORB` keeps only the `B` of `-BG`'s own `K`). That fragment still decodes as
+    /// *some* sound, just never the one that was meant, which reads as arbitrary rather than
+    /// learnable even to someone who already knows the brief. A whole key used as a pure
+    /// memorized mnemonic completely unrelated to the word's own sound (`it` on the onset `T`,
+    /// which "it" doesn't start with) isn't this — it shares no keys with "it" having no onset at
+    /// all, so there's nothing to fragment, and it's exactly as learnable as any other memorized
+    /// brief, nothing new to work out. Only a sound's *own* keys, partly present, are rejected.
     pub fn matches_real_consonants(&self, outline: &[Stroke], word: &str, sounds: &[String]) -> bool {
         let Some(syllables) = self.syllables(&self.label(word, sounds)) else {
             return true;
@@ -1110,13 +1129,16 @@ impl Rules {
         ) else {
             return true;
         };
-        let Some(got_first) = self.resolve_stroke(first_stroke) else {
-            return false;
+        let onset_bits = first_stroke.0 & Stroke::LEFT;
+        let coda_bits = last_stroke.0 & (Stroke::RIGHT | Stroke::STAR);
+        let no_fragment = |tokens: &[String], bits: u32, table: &HashMap<String, Stroke>, cluster: &HashMap<String, Stroke>| {
+            tokens
+                .iter()
+                .filter_map(|t| Self::token_bits(t, table, cluster))
+                .all(|target| !Self::fragments(bits, target))
         };
-        let Some(got_last) = self.resolve_stroke(last_stroke) else {
-            return false;
-        };
-        got_first.onset == first.onset && got_last.coda == last.coda
+        no_fragment(&first.onset, onset_bits, &self.onset, &self.onset_cluster)
+            && no_fragment(&last.coda, coda_bits, &self.coda, &self.coda_cluster)
     }
 
     /// The best reading the rules can give a stroke outline: each stroke's sounds, read back

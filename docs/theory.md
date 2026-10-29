@@ -16,14 +16,16 @@
    cheapest of several, and whatever its rule outline or short forms would have claimed is never
    reserved, so a later, less common word is free to take it instead — a brief can shorten a
    completely unrelated word as a side effect, since words are settled once, commonest first,
-   with nothing undone to recheck afterwards. Among a word's candidate outlines (Plover's,
-   Lapwing's, and any shorter variant either offers), the one picked must read back, under these
-   same rules, as the word's own first and last sound — not just the fewest keys. Plover's own
-   shortest outline is sometimes its own theory's memorized one-off trick, holding only half of a
-   two-key sound (`good`'s Plover brief `KPWAOD` keeps the `P W` of `TKPW`'s own "g" but drops the
-   `T`, reading back as "k" not "g"); a fragment like that still decodes as *some* sound under
-   these rules, just never the one meant, which is what makes it arbitrary rather than learnable.
-   Fewest keys only breaks a tie between candidates that already read back correctly.
+   with nothing undone to recheck afterwards. A brief is free to be a pure memorized shortcut with
+   no phonetic connection to its word at all — that's the point of a brief, and nothing about it
+   needs to be "learnable from the rules" the way a generated outline is. What a candidate may
+   never do is take only *part* of a key combination these same rules only ever use *together* for
+   one sound. Plover's own shortest outline is sometimes exactly that: a fragment of its own
+   theory's multi-key sound, not a clean shortcut (`good`'s Plover brief `KPWAOD` keeps the `P W`
+   of `TKPW`'s own "g" but drops the `T`, which these rules read back as "k", not "g" — a
+   different, wrong sound, not just an unrelated memorized one). That fragment is rejected in
+   favor of the next candidate that either uses the whole cluster or none of it at all; fewest
+   keys then picks among whichever candidates are left.
 3. **Phonetic rules** (`rules/plover.toml`). Where each sound goes on the keyboard in Plover
    theory: consonants at the start of a syllable, the vowel, consonants at the end, and the
    clusters that fold (`NG K` is `*PBG`, `S T` is `-FT`). A vowel with an `R` of its own (`ER`,
