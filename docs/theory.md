@@ -64,8 +64,8 @@
    form beside its rule outline, so the dictionary holds both ends of the spectrum and the
    cheapest counts; a word with a brief has already settled for its one entry (see rule 1).
 8. **Judged by cost.** `build` prints how many strokes and keys a word takes on average, weighted
-   by how often it is said, next to Plover and Lapwing on the same words. The numbers are in
-   **[the benchmarks page](benchmarks.md)**.
+   by how often it is said, next to Plover and Lapwing on the same words. The numbers are on
+   **[the main README](../README.md#where-lyk-stands)**.
 
 See also: **[the full suffix table](suffixes.md)**, and **[how a miss resolves](fallback.md)**
 for what happens when a stroke misses the dictionary outright.

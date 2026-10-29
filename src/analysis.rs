@@ -134,6 +134,9 @@ struct Tally {
     plover_keys_weighted: f64,
     lapwing_strokes_weighted: f64,
     lapwing_keys_weighted: f64,
+    /// How often words of this syllable count are actually said, in the same units as `words`
+    /// but weighted (`Setup::count`) instead of counted once per distinct word.
+    usage_weight: f64,
 }
 
 /// `score`'s and `check_readme`'s shared tally: by syllable count, then "all" last.
@@ -179,6 +182,7 @@ fn tallies(setup: &Setup, briefs: &generate::Briefs, common: usize) -> Result<Ve
             tally.lapwing += usize::from(lapwing);
             tally.either += usize::from(plover || lapwing);
             let weight = setup.count.get(word).copied().unwrap_or(0) as f64;
+            tally.usage_weight += weight;
             if let Some((&(this_strokes, this_keys), (plover_strokes, plover_keys))) = cost {
                 tally.costed += 1;
                 tally.this_strokes += this_strokes as f64;
@@ -214,21 +218,21 @@ fn tallies(setup: &Setup, briefs: &generate::Briefs, common: usize) -> Result<Ve
 }
 
 /// How many of the words the rules write the way Plover and Lapwing do, by syllables, and how
-/// many keys each syllable count takes per stroke, lyk next to Plover and Lapwing.
+/// many keys each syllable count takes per stroke, Lyk next to Plover and Lapwing.
 pub fn score(setup: &Setup, briefs: &generate::Briefs, common: usize) -> Result<()> {
     let rows = tallies(setup, briefs, common)?;
     println!(
         "the {common} most common words that Plover or Lapwing write and CMUdict pronounces\n"
     );
     println!(
-        "syllables   words  written   plover  lapwing   either  keys/stroke: this  plover  \
-         lapwing  by usage: this  plover  lapwing"
+        "syllables   words  written   plover  lapwing   either  keys/stroke: lyk  plover  \
+         lapwing  by frequency: lyk  plover  lapwing"
     );
     for (label, t) in rows {
         let pct = |n: usize| format!("{:>5.1}%", 100.0 * n as f64 / t.words.max(1) as f64);
         let per_stroke = |keys: f64, strokes: f64| keys / strokes.max(1.0);
         println!(
-            "{label:<9} {:>7} {:>8} {:>8} {:>8} {:>8}  {:>17.3} {:>7.3} {:>7.3}  {:>9.3} \
+            "{label:<9} {:>7} {:>8} {:>8} {:>8} {:>8}  {:>16.3} {:>7.3} {:>7.3}  {:>13.3} \
              {:>7.3} {:>7.3}",
             t.words,
             pct(t.written),
@@ -246,15 +250,16 @@ pub fn score(setup: &Setup, briefs: &generate::Briefs, common: usize) -> Result<
     Ok(())
 }
 
-/// The README's basic syllable table, rendered fresh from `tallies` as the exact markdown it
-/// should contain between the `<!-- lyk:score-table:start/end -->` markers.
+/// The README's basic syllable table: how often the rules match Plover/Lapwing, and keys per
+/// stroke, by syllable count, counting every distinct word once. Rendered fresh from `tallies`
+/// between the `<!-- lyk:score-table:start/end -->` markers.
 fn score_markdown(setup: &Setup, briefs: &generate::Briefs, common: usize) -> Result<String> {
     let rows = tallies(setup, briefs, common)?;
     let pct = |n: usize, of: usize| format!("{:.0}%", 100.0 * n as f64 / of.max(1) as f64);
     let per_stroke = |keys: f64, strokes: f64| format!("{:.2}", keys / strokes.max(1.0));
     let mut out = String::new();
     out.push_str(
-        "| Syllables | Same as Plover or Lapwing | Plover | Lapwing | Keys/Stroke (this) | \
+        "| Syllables | Same as Plover or Lapwing | Plover | Lapwing | Keys/Stroke (Lyk) | \
          Keys/Stroke (Plover) | Keys/Stroke (Lapwing) |\n",
     );
     out.push_str("|---|---|---|---|---|---|---|\n");
@@ -278,16 +283,17 @@ fn score_markdown(setup: &Setup, briefs: &generate::Briefs, common: usize) -> Re
     Ok(out)
 }
 
-/// The README's usage-weighted table: the same keys/stroke figure as [`score_markdown`], but
-/// weighted by how often each word is actually said, for all three theories side by side (not
-/// just this one) — rendered fresh between the `<!-- lyk:usage-table:start/end -->` markers.
+/// The README's frequency-weighted table: the same keys/stroke figure as [`score_markdown`], but
+/// with each word counted not once, but as many times as it is actually said — so a handful of
+/// very common words dominate the number and a long tail of rare ones barely move it. Rendered
+/// fresh between the `<!-- lyk:usage-table:start/end -->` markers.
 fn usage_markdown(setup: &Setup, briefs: &generate::Briefs, common: usize) -> Result<String> {
     let rows = tallies(setup, briefs, common)?;
     let per_stroke = |keys: f64, strokes: f64| format!("{:.2}", keys / strokes.max(1.0));
     let mut out = String::new();
     out.push_str(
-        "| Syllables | Keys/Stroke (this, by usage) | Keys/Stroke (Plover, by usage) | \
-         Keys/Stroke (Lapwing, by usage) |\n",
+        "| Syllables | Keys/Stroke (Lyk, by frequency) | Keys/Stroke (Plover, by frequency) | \
+         Keys/Stroke (Lapwing, by frequency) |\n",
     );
     out.push_str("|---|---|---|---|\n");
     for (label, t) in &rows {
@@ -305,10 +311,102 @@ fn usage_markdown(setup: &Setup, briefs: &generate::Briefs, common: usize) -> Re
     Ok(out)
 }
 
+/// How common each syllable count is, counting every distinct word once. Rendered fresh between
+/// the `<!-- lyk:syllable-words-table:start/end -->` markers.
+fn syllable_words_markdown(setup: &Setup, briefs: &generate::Briefs, common: usize) -> Result<String> {
+    let rows = tallies(setup, briefs, common)?;
+    let total_words = rows
+        .iter()
+        .find(|(label, _)| label == "all")
+        .map_or(0, |(_, t)| t.words);
+    let mut out = String::new();
+    out.push_str("| Syllables | Share of distinct words |\n|---|---|\n");
+    for (label, t) in &rows {
+        if label == "all" || label == "0" {
+            continue;
+        }
+        writeln!(
+            out,
+            "| {label} | {:.0}% |",
+            100.0 * t.words as f64 / total_words.max(1) as f64
+        )?;
+    }
+    Ok(out)
+}
+
+/// How common each syllable count is, weighted by how often each word is actually said — so
+/// this is "how much of everything anyone types falls into this bucket", not "how many words of
+/// this length exist". Rendered fresh between the `<!-- lyk:syllable-usage-table:start/end -->`
+/// markers.
+fn syllable_usage_markdown(
+    setup: &Setup,
+    briefs: &generate::Briefs,
+    common: usize,
+) -> Result<String> {
+    let rows = tallies(setup, briefs, common)?;
+    let total_weight = rows
+        .iter()
+        .find(|(label, _)| label == "all")
+        .map_or(0.0, |(_, t)| t.usage_weight);
+    let mut out = String::new();
+    out.push_str("| Syllables | Share of words actually said |\n|---|---|\n");
+    for (label, t) in &rows {
+        if label == "all" || label == "0" {
+            continue;
+        }
+        writeln!(
+            out,
+            "| {label} | {:.0}% |",
+            100.0 * t.usage_weight / total_weight.max(1.0)
+        )?;
+    }
+    Ok(out)
+}
+
+/// The single overall figure: keys per stroke across every word at once (not broken down by
+/// syllable), weighted by how often each word is actually said. Explained by the same two
+/// things as [`usage_markdown`] and [`syllable_usage_markdown`] together (how many keys a
+/// stroke takes at each syllable count, and how much of everything typed is that syllable
+/// count), though not a plain weighted average of the first by the second: this weights by
+/// usage directly, strokes included, rather than averaging per-syllable ratios. Reads straight
+/// off the `tallies` "all" row. Rendered fresh between the `<!-- lyk:overall-table:start/end -->`
+/// markers.
+fn overall_markdown(setup: &Setup, briefs: &generate::Briefs, common: usize) -> Result<String> {
+    let rows = tallies(setup, briefs, common)?;
+    let Some((_, t)) = rows.iter().find(|(label, _)| label == "all") else {
+        anyhow::bail!("tallies() did not produce an \"all\" row");
+    };
+    let per_stroke = |keys: f64, strokes: f64| format!("{:.2}", keys / strokes.max(1.0));
+    let mut out = String::new();
+    out.push_str("| Theory | Keys/Stroke, weighted by how often each word is said |\n|---|---|\n");
+    writeln!(
+        out,
+        "| Lyk | {} |",
+        per_stroke(t.this_keys_weighted, t.this_strokes_weighted)
+    )?;
+    writeln!(
+        out,
+        "| Plover | {} |",
+        per_stroke(t.plover_keys_weighted, t.plover_strokes_weighted)
+    )?;
+    writeln!(
+        out,
+        "| Lapwing | {} |",
+        per_stroke(t.lapwing_keys_weighted, t.lapwing_strokes_weighted)
+    )?;
+    Ok(out)
+}
+
 const README_START: &str = "<!-- lyk:score-table:start -->";
 const README_END: &str = "<!-- lyk:score-table:end -->";
 const USAGE_START: &str = "<!-- lyk:usage-table:start -->";
 const USAGE_END: &str = "<!-- lyk:usage-table:end -->";
+const WORDS_START: &str = "<!-- lyk:syllable-words-table:start -->";
+const WORDS_END: &str = "<!-- lyk:syllable-words-table:end -->";
+const SYLL_USAGE_START: &str = "<!-- lyk:syllable-usage-table:start -->";
+const SYLL_USAGE_END: &str = "<!-- lyk:syllable-usage-table:end -->";
+const OVERALL_START: &str = "<!-- lyk:overall-table:start -->";
+const OVERALL_END: &str = "<!-- lyk:overall-table:end -->";
 
 /// The text strictly between a `start`/`end` marker pair in `text`.
 fn between<'a>(text: &'a str, start: &str, end: &str) -> Result<&'a str> {
@@ -321,44 +419,55 @@ fn between<'a>(text: &'a str, start: &str, end: &str) -> Result<&'a str> {
     Ok(current)
 }
 
-/// Whether the README's two score tables still match what `score` would compute today. Prints
-/// the up-to-date tables and returns an error (so CI or a habit of running this before a commit
-/// catches drift) when either doesn't; each table's own markers decide what gets compared, so
-/// the surrounding prose is never touched by this check (or by anything that would write it).
+type TableFn = fn(&Setup, &generate::Briefs, usize) -> Result<String>;
+
+/// Every table the README keeps in sync with `tallies`, as (name, markers, generator).
+const TABLES: &[(&str, &str, &str, TableFn)] = &[
+    ("score", README_START, README_END, score_markdown),
+    ("frequency-weighted", USAGE_START, USAGE_END, usage_markdown),
+    (
+        "syllables by distinct word",
+        WORDS_START,
+        WORDS_END,
+        syllable_words_markdown,
+    ),
+    (
+        "syllables by usage",
+        SYLL_USAGE_START,
+        SYLL_USAGE_END,
+        syllable_usage_markdown,
+    ),
+    ("overall", OVERALL_START, OVERALL_END, overall_markdown),
+];
+
+/// Whether the README's tables still match what `score` would compute today. Prints the
+/// up-to-date table(s) and returns an error (so CI or a habit of running this before a commit
+/// catches drift) when any don't; each table's own markers decide what gets compared, so the
+/// surrounding prose is never touched by this check (or by anything that would write it).
 pub fn check_readme(
     setup: &Setup,
     briefs: &generate::Briefs,
     common: usize,
     readme: &Path,
 ) -> Result<()> {
-    let fresh_score = score_markdown(setup, briefs, common)?;
-    let fresh_usage = usage_markdown(setup, briefs, common)?;
     let text = std::fs::read_to_string(readme).with_context(|| readme.display().to_string())?;
-    let current_score = between(&text, README_START, README_END)
-        .with_context(|| format!("in {}", readme.display()))?;
-    let current_usage = between(&text, USAGE_START, USAGE_END)
-        .with_context(|| format!("in {}", readme.display()))?;
-    let score_ok = current_score.trim() == fresh_score.trim();
-    let usage_ok = current_usage.trim() == fresh_usage.trim();
-    if score_ok && usage_ok {
-        println!("both score tables match: {}", readme.display());
+    let mut all_ok = true;
+    for (name, start, end, generate) in TABLES {
+        let fresh = generate(setup, briefs, common)?;
+        let current =
+            between(&text, start, end).with_context(|| format!("in {}", readme.display()))?;
+        if current.trim() != fresh.trim() {
+            all_ok = false;
+            println!(
+                "{} has a stale {name} table between {start} and {end}. it should read:\n",
+                readme.display()
+            );
+            println!("{fresh}");
+        }
+    }
+    if all_ok {
+        println!("every table matches: {}", readme.display());
         return Ok(());
-    }
-    if !score_ok {
-        println!(
-            "{} has a stale score table between {README_START} and {README_END}. it should \
-             read:\n",
-            readme.display()
-        );
-        println!("{fresh_score}");
-    }
-    if !usage_ok {
-        println!(
-            "{} has a stale usage table between {USAGE_START} and {USAGE_END}. it should \
-             read:\n",
-            readme.display()
-        );
-        println!("{fresh_usage}");
     }
     anyhow::bail!(
         "{} has a stale table — paste the table(s) above over what's there now",

@@ -11,37 +11,24 @@ written in Rust, with the rules as data. American English only.
 
 ## Where lyk stands
 
-On the 100,000 most common words that Plover or Lapwing write and CMUdict pronounces, the rules
-write 99.9% of them, and write the word the way Plover or Lapwing does (ignoring the join key and
-the `KWR` or star they put on a continuation stroke, which the join key replaces) for:
+One overall number: keys pressed per stroke across every word at once, weighted by how often each
+word is actually said — so common short words dominate it and rare long ones barely register,
+which is closer to what typing each theory really feels like than counting every distinct word
+once would be.
 
-<!-- lyk:score-table:start -->
-| Syllables | Same as Plover or Lapwing | Plover | Lapwing | Keys/Stroke (this) | Keys/Stroke (Plover) | Keys/Stroke (Lapwing) |
-|---|---|---|---|---|---|---|
-| 1 | 90% | 78% | 83% | 5.72 | 5.66 | 5.83 |
-| 2 | 60% | 45% | 52% | 5.68 | 4.93 | 5.27 |
-| 3 | 39% | 26% | 33% | 5.29 | 4.80 | 5.15 |
-| 4+ | 24% | 17% | 19% | 5.30 | 4.97 | 5.22 |
-<!-- lyk:score-table:end -->
+<!-- lyk:overall-table:start -->
+| Theory | Keys/Stroke, weighted by how often each word is said |
+|---|---|
+| Lyk | 3.49 |
+| Plover | 3.51 |
+| Lapwing | 3.93 |
+<!-- lyk:overall-table:end -->
 
-The same keys/stroke figure, weighted by how often each word is actually said instead of counting
-every distinct word once regardless of how rare it is, for all three theories side by side:
-
-<!-- lyk:usage-table:start -->
-| Syllables | Keys/Stroke (this, by usage) | Keys/Stroke (Plover, by usage) | Keys/Stroke (Lapwing, by usage) |
-|---|---|---|---|
-| 1 | 3.09 | 3.16 | 3.58 |
-| 2 | 4.93 | 4.70 | 5.00 |
-| 3 | 4.97 | 4.93 | 5.25 |
-| 4+ | 5.18 | 5.24 | 5.50 |
-<!-- lyk:usage-table:end -->
-
-One-syllable words drop sharply under this weighting for every theory, not just lyk, because a
-handful of extremely common short words ("the", "a", "to", "of"...) dominate real typing far more
-than the long tail of rare one-syllable words. Both tables are run and checked automatically
-(`score --check-readme`), not hand-typed — see [the full benchmarks page](docs/benchmarks.md) for
-the rest: strokes/keys per word, cost by how common a word is, and the caveats behind these
-numbers.
+This one number is a composition of two things: how many keys a stroke takes for a word of a
+given syllable count, and how much of everything anyone actually types falls into that syllable
+count — both broken out in full, along with the rest of the numbers, at
+[the bottom of this README](#full-benchmarks). Run and checked automatically
+(`score --check-readme`), not hand-typed.
 
 ## Documentation
 
@@ -54,8 +41,10 @@ Quick links:
   the one rule they're derived from, and what isn't covered yet.
 - **[The orthographic fallback](docs/fallback.md)** — what a stroke that misses the dictionary
   reads back as, and how that logic becomes keymux's WASM plugin, generated rather than hand-copied.
-- **[Where lyk stands](docs/benchmarks.md)** — the numbers, next to Plover and Lapwing, on the
-  same words.
+
+The numbers themselves (this page's "Where lyk stands" above, and the full breakdown at
+[the bottom of this README](#full-benchmarks)) aren't a separate doc page — they're meant to be
+seen, not looked up.
 
 ## Main features
 
@@ -67,7 +56,7 @@ Quick links:
 - **An explicit join key**: continuation strokes are never mistaken for words, which is what lets
   suffixes be as short as a single key.
 - **Measured, not asserted**: `build` and `score` print cost and match-rate against Plover and
-  Lapwing on the same words, every time — see [the benchmarks](docs/benchmarks.md).
+  Lapwing on the same words, every time — see [the full benchmarks](#full-benchmarks).
 - **A miss always resolves**: a stroke the dictionary doesn't have still reads back as something
   sensible, phonetically, as a real engine's last resort — see [the fallback page](docs/fallback.md).
 
@@ -77,7 +66,7 @@ Quick links:
 cargo run --release -- fetch               # download the data into data/ (safe to re-run)
 cargo run --release -- report              # what was loaded
 cargo run --release -- score               # how often the rules match Plover or Lapwing
-cargo run --release -- score --check-readme   # does docs/benchmarks.md's score table still match?
+cargo run --release -- score --check-readme   # do this README's tables still match?
 cargo run --release -- build               # briefs + rules -> out/lyk.json, with the cost
 cargo run --release -- plugin              # generate keymux's WASM fallback plugin from the rules
 cargo run --release -- explain moon        # which rules wrote a word, next to Plover and Lapwing
@@ -96,3 +85,99 @@ found: it counts what keys Plover and Lapwing use where they agree.
 | Pronunciations | CMUdict, MFA US dictionary, WikiPron US broad |
 | Word frequency | hermitdave/FrequencyWords (OpenSubtitles 2018) |
 | Dictionaries to match | Plover `main.json` and `commands.json`, Lapwing dictionaries |
+
+## Full benchmarks
+
+Everything behind [the one overall number above](#where-lyk-stands), in full. On the 100,000 most
+common words that Plover or Lapwing write and CMUdict pronounces, the rules write 99.9% of them,
+and write the word the way Plover or Lapwing does (ignoring the join key and the `KWR` or star
+they put on a continuation stroke, which the join key replaces) for:
+
+<!-- lyk:score-table:start -->
+| Syllables | Same as Plover or Lapwing | Plover | Lapwing | Keys/Stroke (Lyk) | Keys/Stroke (Plover) | Keys/Stroke (Lapwing) |
+|---|---|---|---|---|---|---|
+| 1 | 90% | 78% | 83% | 5.72 | 5.66 | 5.83 |
+| 2 | 60% | 45% | 52% | 5.68 | 4.93 | 5.27 |
+| 3 | 39% | 26% | 33% | 5.29 | 4.80 | 5.15 |
+| 4+ | 24% | 17% | 19% | 5.30 | 4.97 | 5.22 |
+<!-- lyk:score-table:end -->
+
+"Keys/Stroke" above counts every distinct word once, regardless of how rare it is. The same
+figure, with each word counted not once but as many times as it is actually said — so a handful
+of very common words dominate it and a long tail of rare ones barely move it:
+
+<!-- lyk:usage-table:start -->
+| Syllables | Keys/Stroke (Lyk, by frequency) | Keys/Stroke (Plover, by frequency) | Keys/Stroke (Lapwing, by frequency) |
+|---|---|---|---|
+| 1 | 3.09 | 3.16 | 3.58 |
+| 2 | 4.93 | 4.70 | 5.00 |
+| 3 | 4.97 | 4.93 | 5.25 |
+| 4+ | 5.18 | 5.24 | 5.50 |
+<!-- lyk:usage-table:end -->
+
+One-syllable words drop sharply under this weighting for every theory, not just Lyk, because a
+handful of extremely common short words ("the", "a", "to", "of"...) dominate real typing far more
+than the long tail of rare one-syllable words.
+
+How common each syllable count actually is — first counting every distinct word once:
+
+<!-- lyk:syllable-words-table:start -->
+| Syllables | Share of distinct words |
+|---|---|
+| 1 | 28% |
+| 2 | 41% |
+| 3 | 22% |
+| 4+ | 10% |
+<!-- lyk:syllable-words-table:end -->
+
+...and then weighted by how often each word is actually said, which is "how much of everything
+anyone types has this many syllables", not "how many words of this length exist":
+
+<!-- lyk:syllable-usage-table:start -->
+| Syllables | Share of words actually said |
+|---|---|
+| 1 | 80% |
+| 2 | 15% |
+| 3 | 4% |
+| 4+ | 1% |
+<!-- lyk:syllable-usage-table:end -->
+
+Most of what anyone actually types is one or two syllables, which is why [the overall number at
+the top of this README](#where-lyk-stands) sits so much closer to the one- and two-syllable
+frequency-weighted figures above than to the longer-word ones — it's these two tables together:
+how much of everything typed is each syllable count, and how many keys a stroke takes at each
+one.
+
+Longer words differ mostly where Plover and Lapwing have a brief, and where Lyk writes a bare
+`^-R` for an `-er` they write `*ER`. `mismatches --syllables N --after 1500` lists what is left.
+
+`build` on the words all three dictionaries write, strokes and keys per word:
+
+| | Strokes | Keys |
+|---|---|---|
+| Lyk | 1.033 | 4.019 |
+| Plover | 1.051 | 4.085 |
+| Lapwing | 1.051 | 4.164 |
+
+By how common the word is (`build` prints this), keys per word:
+
+| Words | Share of all words said | Lyk | Plover | Lapwing |
+|---|---|---|---|---|
+| top 100 | 57% | 2.81 | 2.82 | 2.91 |
+| 100 to 1,000 | 28% | 5.04 | 5.18 | 5.23 |
+| 1,000 to 5,000 | 10% | 6.14 | 6.42 | 6.52 |
+| 5,000 to 20,000 | 4% | 8.04 | 7.87 | 8.06 |
+
+The top thousand words are briefs in all three, which is why the dictionaries are close: the
+rules can only move the rest.
+
+That is with the join key on every continuation stroke counted, and with a Plover outline counted
+only when Lapwing has it too: Plover's `main.json` is full of misstrokes (`O` for *to*, `SP` for
+*and*) that would otherwise make it look a third of a key cheaper than it is. About 1,200 words
+end up with a star form because another word sounds the same and has the plain outline (`site`
+and `sight`, `don` and `done`); `build` lists the commonest. About 100 of the 100,000 words can't
+be written by these rules yet, nearly all names and interjections (`hm`, `schmidt`, `vlad`).
+
+These numbers move whenever a brief or suffix is added — see [the theory page](docs/theory.md) for
+the rule, and run `cargo run --release -- score --check-readme` before committing a rules change
+to catch drift here automatically.
