@@ -6,31 +6,44 @@ Not a changelog, not shipped — a working plan, written up after a round of liv
 feedback, and reading other theory-builders' write-ups. Nothing here is built yet; each item gets
 its own commit when it lands.
 
-## 1. Correctness first — verify what already exists before building more
+## 1. Correctness first — done
 
 Several pieces assumed missing earlier in this plan turned out to already exist in the deployed
-config (`~/.config/keymux/steno/lyk/`), just unverified:
+config (`~/.config/keymux/steno/lyk/`), and testing them surfaced one real, structural bug —
+fixed, not just found:
 
 - **Fingerspelling, misc keys, OS shortcuts** (`04-lyk-emilys-modifiers.py`/`.json`) — full A-Z
   fingerspelling, Tab/Backspace/Delete/Escape, arrows, page nav, media keys, typable symbols with
   shift variants, and Shift/Alt/Super/Ctrl chording for any key. Forked from Lapwing's "Emily's
-  Modifier Dictionary," theory-independent. **Needs testing on the live daemon, not building.**
+  Modifier Dictionary," theory-independent. Tested, working.
 - **Punctuation** (`03-lyk-punctuation.json`) — periods, commas, question marks, exclamation,
   colon, semicolon, quotes, parens, dashes, and a long tail of symbol strokes, forked from Plover's
-  own. **Needs testing, not building.**
+  own. Tested — found that `TP-BG` (`!`, Lapwing's own convention) was silently unreachable: the
+  generated word dictionary loads at *higher* priority than punctuation in a real keymux config, so
+  a word the generator independently picked for the same stroke ("factory") shadowed it. Not a
+  one-off: the generator had no idea punctuation, commands, or fingerspelling strokes existed at
+  all, so this could resurface for any word on any future regeneration. Fixed structurally, not
+  patched: `rules/reserved/` now holds a copy of the deployed commands, punctuation, and
+  fingerspelling dictionaries, and `generate()` reserves every stroke in them before a single word
+  is assigned an outline — the same mechanism briefs already use to reserve their own strokes.
+  40 strokes total were affected; cost impact negligible (keys/word moved from 3.945 to 3.950).
 - **Quotes** (`cargo run -- quote`) — already pulls live from `zenquotes.io`, already strokes the
-  result next to Plover/Lapwing. **Needs an end-to-end correctness pass**: run real quotes through
-  the live daemon and confirm punctuation, capitalization, apostrophes, and fallback all resolve
-  cleanly, not just that the command runs.
+  result next to Plover/Lapwing. Still worth an end-to-end pass through the live daemon on a real
+  quote to confirm punctuation/caps/apostrophes/fallback all resolve cleanly together, not just
+  that the command runs — not yet done.
 - **Reverse lookup** (`cargo run -- explain WORD`) — already goes word → stroke(s) across all three
   theories. Functionally there; a dedicated `lookup` alias with a terser output is a nice-to-have,
-  not a gap.
-- **Regenerate and redeploy**: `build` (dictionary) and `plugin` (WASM fallback) against current
-  `rules/`, diff against what's actually deployed, push anything stale.
-- **Resolve the open plugin question**: the theory-faithful generated plugin resolves `-T/^AO` to
-  "tuh" (matching `rules.rs`'s real AO-vs-AOU distinction) instead of "too" (the old hand-written
-  plugin's bug, never corrected). Still undeployed pending a decision — needs one before `plugin`
-  output replaces the hand-copied file for good.
+  not a gap. (Separately, a much bigger reverse-lookup redesign is in progress elsewhere — see
+  keymux's own planning for that, not this repo.)
+- **The AO/UH fallback tie-break**: fixed — see `3822e12`. The orthographic fallback's best guess
+  for a bare `AO` stroke is now "oo" (`UW.oo`), not "uh" (`UH`), since the latter was the rarer of
+  three colliding readings despite "winning" by an accidental plain-vs-variant tie-break rule.
+- **Brief outlines that split a two-key consonant in half** (`good`, `day`, `work`, and 245 of the
+  1500 auto-briefed words total): fixed — see `93251ef`. A brief now has to read back as the
+  word's real first and last sound under lyk's own rules, not just be the fewest keys. Real
+  tradeoff, not free: the headline number moved from 3.49 to 3.73 keys/stroke, now behind Plover's
+  3.51 instead of ahead of it — see [the main README](../README.md#where-lyk-stands) for the full
+  explanation, written up there rather than hidden.
 
 ## 2. Dictionary growth
 

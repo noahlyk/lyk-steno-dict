@@ -12,6 +12,18 @@ use std::path::Path;
 const BUILT_IN_BRIEFS: &str = include_str!("../rules/briefs.toml");
 const BUILT_IN_SUFFIXES: &str = include_str!("../rules/suffixes.toml");
 
+/// Every stroke that isn't a word at all: the commands, punctuation, and fingerspelling/OS-key
+/// dictionaries deployed alongside the generated dictionary in a real keymux config. These load
+/// at *higher* priority than the generated words there, so a word that happens to land on the
+/// same stroke as one of these is never reachable — a real stroke, that was never a bug in the
+/// deployed config, just unknown to the generator. Reserved the same way a brief's outline is
+/// (see `generate`), so the collision can't resurface on the next regeneration.
+const RESERVED: &[(&str, &str)] = &[
+    ("a command", include_str!("../rules/reserved/commands.json")),
+    ("a punctuation mark", include_str!("../rules/reserved/punctuation.json")),
+    ("a fingerspelled letter or OS shortcut", include_str!("../rules/reserved/emilys-modifiers.json")),
+];
+
 /// A brief this short was hand-picked by a theory's authors, not derived from frequency: see
 /// [`generate`].
 const TINY_BRIEF_KEYS: u32 = 2;
@@ -145,6 +157,21 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
     let mut taken: HashMap<String, String> = HashMap::new();
     let mut entries: Vec<Entry> = Vec::new();
     let mut pinned: HashSet<String> = HashSet::new();
+
+    // Reserved first of all, ahead of even the suffixes: a stroke a real keymux config already
+    // gives to a command, a punctuation mark, or fingerspelling is never available to a word,
+    // whatever the rules would have generated for it.
+    for (kind, json) in RESERVED {
+        let strokes: HashMap<String, String> = serde_json::from_str(json)
+            .with_context(|| format!("rules/reserved: {kind} dictionary"))?;
+        for outline_text in strokes.keys() {
+            let Some(outline) = parse_outline(outline_text) else {
+                continue;
+            };
+            let text = render_outline(&outline);
+            taken.entry(text).or_insert_with(|| format!("reserved ({kind})"));
+        }
+    }
 
     // Standalone suffixes, first of all: a word that would otherwise land on the same outline
     // as one of these loses to it, the same way a brief does, since a suffix is struck on its
