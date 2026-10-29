@@ -10,3 +10,17 @@ default = "plover"
 # Per word: a source, or the outline itself. For example `he = "plover"` (HE, not HAOE) or
 # `the = "-T"`.
 [word]
+
+# The join key doubles every continuation-stroke shape into a second, totally separate outline
+# (`^-G` is "ing", bare `-G` is not that stroke at all): a plain one-key right-hand outline is
+# never ambiguous with a suffix the way it would have to be careful about in Plover, so it is
+# free to give to a whole word instead. Of the ten single right-hand keys, three were already
+# spoken for this way (`-F` "of", `-B` "be", `-T` "the"); these claim the rest, each for a common
+# word that keeps its longer form as a second, ordinary outline:
+were = "-R"  # ER reduces (same rule the suffix table uses): "were" was "WR"
+up = "-P"    # AH reduces: "up" was "UP"
+all = "-L"   # ends in the L sound: "all" was "AUL"
+go = "-G"    # first letter: "go" was "TKW"
+do = "-D"    # first letter: "do" was "TKO"
+was = "-Z"   # AH reduces, ending in the Z sound: "was" was "WA"
+yes = "-S"   # ends in the S sound: "yes" was "KWRE"
