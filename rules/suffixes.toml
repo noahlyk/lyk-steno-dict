@@ -2,17 +2,20 @@
 # its own, the way Plover's own bundled suffix dictionary does, so one can be added to any stem
 # — not only the ones the generator happened to fold one onto while building a specific word.
 #
-# Every key here is the same continuation-stroke mechanism `rules/plover.toml`'s `[coda]` and
-# `[coda_cluster]` already use when a word's own reduced final syllable folds onto a stroke of
-# its own (see the README, "Several syllables"): the suffix's consonants, reduced vowel dropped,
-# written on the right hand in steno order. That keeps a suffix struck on its own identical to
-# the stroke a whole word already ends in, so the two reinforce the same muscle memory instead of
-# teaching a second, unrelated one.
-#
-# Only suffixes whose vowel genuinely reduces to nothing in ordinary speech are here: one that
-# keeps a real vowel (`-tion`'s -GS is the schwa-dropped SH-N; `-ous`, `-ive`, `-ism`, `-ship`,
-# `-hood`, `-ward` do not reduce this far) needs a stroke with a vowel of its own, which is a
-# different, not yet built, part of this table.
+# The rule behind every entry below, old and new: a suffix is a syllable like any other, so it
+# is written by running its own sounds through the exact tables `rules/plover.toml` already uses
+# for any syllable — `[onset]`, `[vowel]`, `[coda]`, `[coda_cluster]`, `[vowel_coda]` — nothing
+# here is a key combination invented for this file. Its vowel is then dropped, the same way
+# `[reduce]`'s `vowels` list (`AH`, `IH`, `ER`, the `-ly` spelling of `IY`, the `-ed` spelling of
+# `OW`) already drops a whole word's own reduced final syllable when it folds onto a continuation
+# stroke of its own, **whenever that still tells the suffix apart from every other suffix stroke
+# already in this table** — bare consonants read the same whether they came from a word's ending
+# or a suffix struck on its own, which is the point. When dropping the vowel would land on a
+# stroke another suffix already claims (`-ism`'s own `Z` would be `^-Z`, "s"'s stroke; `-ist`'s
+# `S T` would be `^-FT`, "est"'s; `-ance`'s `N S` would be `^-PBS`, "ness"'s), the vowel stays to
+# tell them apart, and a vowel outside `[reduce]` (`AY`, `UH`, `AO`, a bare un-labelled `IY`)
+# never had anything to drop in the first place. A suffix that is genuinely two syllables (`-ism`,
+# `-ary`) strokes as two continuations, each one still just a syllable through the same rule.
 
 "^-G" = "ing"
 "^-D" = "ed"
@@ -39,3 +42,28 @@
 # "-some" ("awe-some", "lone-some"): S then M reduced is the "S M" -> "-FPL" cluster
 # `rules/plover.toml` already has for Plover's own F-insertion convention (`lesson` HR-FPB).
 "^-FPL" = "some"
+
+# Suffixes with a real vowel: the first batch above all happened to reduce to a bare consonant
+# skeleton with nothing else claiming it. These are the rest of the common ones, worked out by
+# the one rule above and checked against every stroke already in this file.
+"^US" = "ous"     # AH + S kept: reduced, it is bare S, "^-S"'s own stroke ("s")
+"^-F" = "ive"     # IH + V reduced: bare -F, unclaimed
+"^AOEUZ" = "ize"  # AY + Z kept: AY is outside `[reduce]`, nothing to drop
+"^SH-P" = "ship"  # SH + IH + P reduced: bare SH-P, unclaimed
+"^HAOD" = "hood"  # HH + UH + D kept: UH is outside `[reduce]`, nothing to drop
+"^WORD" = "ward"  # W + AO + R + D kept: AO is outside `[reduce]`; the vowel+R combo
+                   # `[vowel_coda]` already gives "AO R" ("-ward" of "forward") happens to spell
+                   # "OR", so the whole suffix reads, unintentionally but memorably, as "WORD"
+"^EUFT" = "ist"   # IH + S + T kept: reduced, "S T" is "^-FT"'s own stroke ("est")
+"^UPBS" = "ance"  # AH + N + S kept: reduced, "N S" is "^-PBS"'s own stroke ("ness"); the same
+                   # stroke also reads as "-ence" ("patience"), the identical unstressed sound
+"^AOE" = "y"      # bare IY kept: only the `-ly` spelling of IY is in `[reduce]`, not plain IY
+"^-PBLG" = "age"  # IH + JH reduced: bare -PBLG, the same `[coda]` cluster "village"'s own "-age"
+                   # already ends in, unclaimed on its own
+
+# Two syllables, so two continuation strokes, each one the one rule above applied on its own.
+"^EUZ/^-PL" = "ism"  # IH + Z kept (reduced, "Z" alone is "^-Z"'s own stroke, "s"), then AH + M
+                       # reduced (bare -PL, unclaimed)
+"^-R/^AOE" = "ary"    # "-ary"/"-ery"/"-ory" (same unstressed sound) is, phonetically, exactly
+                       # the already-claimed "-er" stroke followed by the already-claimed "-y"
+                       # stroke above — two syllables this table had already worked out alone
