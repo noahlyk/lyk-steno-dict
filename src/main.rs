@@ -9,6 +9,7 @@ mod fetch;
 mod generate;
 mod gold;
 mod quote;
+mod reverse;
 mod rules;
 mod stroke;
 
@@ -122,6 +123,21 @@ enum Command {
         #[arg(long)]
         briefs: Option<PathBuf>,
     },
+    /// Look a word, phrase, or stroke up, whichever it is: `lookup cat` finds lyk's outline next
+    /// to Plover's and Lapwing's, `lookup "tell me how"` does the same word by word for a whole
+    /// phrase, and `lookup KAT` (all caps, a valid outline) finds what that stroke resolves to
+    /// instead, the same as `resolve`. Mirrors keymux's own `steno lookup`.
+    Lookup {
+        /// The word, phrase, or stroke to look up
+        query: String,
+        /// Words to cover when building the dictionary, most common first (only matters for a
+        /// stroke query, which has to generate the dictionary to tell a real entry from a miss)
+        #[arg(long, default_value_t = 30_000)]
+        common: usize,
+        /// Briefs to use instead of the built-in ones
+        #[arg(long)]
+        briefs: Option<PathBuf>,
+    },
 }
 
 fn main() -> Result<()> {
@@ -202,19 +218,71 @@ fn main() -> Result<()> {
             };
             let strokes = stroke::parse_outline(outline)
                 .with_context(|| format!("{outline:?} is not a stroke outline"))?;
-            let text = stroke::render_outline(&strokes);
-            let generated = generate::generate(&setup, &briefs, *common)?;
-            let index = generate::index(&generated);
-            if let Some(word) = index.get(&text) {
-                println!("{text}  ->  {word}  (in the dictionary)");
-            } else if let Some(reading) = setup.rules.resolve(&strokes) {
-                println!("{text}  ->  {reading}  (not in the dictionary; the rules' best reading)");
-            } else {
-                println!("{text}  ->  no reading the rules allow: a true miss");
+            print_resolve(&setup, &briefs, &strokes, *common)
+        }
+        Command::Lookup {
+            query,
+            common,
+            briefs,
+        } => run_lookup(&setup, query, *common, briefs.as_deref()),
+    }
+}
+
+/// The one lookup, forward or backward: see `reverse::classify`.
+fn run_lookup(
+    setup: &impl Fn(Option<usize>) -> Result<analysis::Setup>,
+    query: &str,
+    common: usize,
+    briefs_path: Option<&Path>,
+) -> Result<()> {
+    match reverse::classify(query) {
+        reverse::Query::Stroke(strokes) => {
+            let setup = setup(Some(common))?;
+            let briefs = match briefs_path {
+                Some(path) => generate::Briefs::load(path)?,
+                None => generate::Briefs::built_in()?,
+            };
+            print_resolve(&setup, &briefs, &strokes, common)
+        }
+        reverse::Query::Text(phrase) => {
+            if phrase.is_empty() {
+                println!("Nothing to look up");
+                return Ok(());
+            }
+            let setup = setup(None)?;
+            for found in reverse::reverse_phrase(&setup, &phrase) {
+                println!(
+                    "{}\n  lyk      {}\n  plover   {}\n  lapwing  {}",
+                    found.word,
+                    found.lyk.as_deref().unwrap_or("?"),
+                    found.plover.as_deref().unwrap_or("?"),
+                    found.lapwing.as_deref().unwrap_or("?"),
+                );
             }
             Ok(())
         }
     }
+}
+
+/// What a stroke outline resolves to: a real dictionary entry, the rules' best phonetic reading
+/// of a miss, or a true miss nothing can read. Shared by `resolve` and `lookup`'s stroke mode.
+fn print_resolve(
+    setup: &analysis::Setup,
+    briefs: &generate::Briefs,
+    strokes: &[stroke::Stroke],
+    common: usize,
+) -> Result<()> {
+    let text = stroke::render_outline(strokes);
+    let generated = generate::generate(setup, briefs, common)?;
+    let index = generate::index(&generated);
+    if let Some(word) = index.get(&text) {
+        println!("{text}  ->  {word}  (in the dictionary)");
+    } else if let Some(reading) = setup.rules.resolve(strokes) {
+        println!("{text}  ->  {reading}  (not in the dictionary; the rules' best reading)");
+    } else {
+        println!("{text}  ->  no reading the rules allow: a true miss");
+    }
+    Ok(())
 }
 
 /// Generate the orthographic-fallback plugin's source and write it to `out`.
