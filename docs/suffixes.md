@@ -44,6 +44,8 @@ continuations, each one still just a syllable through the same rule.
 | `^-LT` | -let | *book-let*, *pig-let* (L, T) |
 | `^*T` | -th | *wid-th*, *warm-th*, *four-th* (the `*T` coda) |
 | `^-FPL` | -some | *awe-some*, *lone-some* (the same S-M → `-FPL` cluster Plover's own F-insertion convention uses, e.g. `lesson` HR-FPB) |
+| `^-BG` | -ic | *bas-ic*, *com-ic*, *mus-ic*, *tox-ic* (no onset of its own — the stem always keeps the consonant before it) |
+| `^T-F` | -tive | *ac-tive*, *posi-tive* (T onset plus the same reduced IH + V `-ive` below already uses) |
 
 ## Suffixes that kept their vowel (dropping it would collide with a stroke above)
 
@@ -52,6 +54,7 @@ continuations, each one still just a syllable through the same rule.
 | `^US` | -ous | reduced to bare `S`, already `^-S`'s own stroke ("s") |
 | `^EUFT` | -ist | reduced to bare `S T`, already `^-FT`'s own stroke ("est") |
 | `^UPBS` | -ance/-ence | reduced to bare `N S`, already `^-PBS`'s own stroke ("ness") — the identical unstressed sound covers both spellings |
+| `^UL` | -al | reduced to bare `L`, already `^-L`'s own stroke ("ly"); no onset of its own either (*national*'s own "-al", once "-tion" has eaten the N, is exactly this bare AH + L) |
 
 ## Suffixes with a real vowel that was never reducible
 
@@ -71,11 +74,23 @@ continuations, each one still just a syllable through the same rule.
 |---|---|---|
 | `^EUZ/^-PL` | -ism | IH + Z reduced (bare `Z`, already `^-Z`'s stroke), then AH + M reduced (bare `-PL`, unclaimed) |
 | `^-R/^AOE` | -ary/-ery/-ory | phonetically exactly the already-claimed `-er` stroke followed by the already-claimed `-y` stroke, two syllables this table had already worked out alone |
+| `^-BG/^UL` | -ical | exactly `-ic` then `-al` above, struck one after the other — the same two already-claimed pieces |
+| `^OL/^SKWREU` | -logy | *bi-ology*, *ge-ology*, *psych-ology* — a genuinely stressed syllable (AA is never in `[reduce]`, so it keeps its vowel the way any stressed syllable does, coda L kept with it), then "-gy" (JH + the plain, never-reduced IY `^AOE` already uses for "-y") |
+| `^U/^TEU` | -ity/-ety | *clar-ity*, *activ-ity*, *anxi-ety*, *soci-ety* — a bare AH with no consonants to drop (keeps its vowel out of necessity, not collision), then T + the "-y" vowel kept. Plain "-ty" with no leading schwa (*safe-ty*) is just the second stroke alone |
+| `^U/^SEU` | -cy/-sy | *priva-cy*, *fanta-sy*, *poli-cy*, *democra-cy* — the same bare-AH first stroke as "-ity" (two different suffixes may share an opening stroke; only the whole outline has to stay distinct), then S + the "-y" vowel kept |
+| `^U/^TPAOEU` | -ify/-fy | *clar-ify*, *simpl-ify*, *ident-ify* — the same bare-AH first stroke again, then F + AY kept (AY never reduces, same as "-ize") |
 
 ## Not yet covered
 
-A suffix with a real vowel that never reduces away and isn't in the table above yet — `-tive`,
-further `-ous` spelling variants, `-ic`/`-ical`, `-al`, `-logy`/`-graphy`, `-ity`/`-ety` — needs a
-stroke built the way a stressed syllable is, not a bare continuation of consonants or a syllable
-run through `[reduce]`. Further work; see [the theory page](theory.md) for how a stressed
-syllable is normally handled.
+- **`-ious`/`-eous`** (*curious*, *serious*, *various*, *obvious*, *previous*, *hideous*) already
+  write with strokes this table has: the extra vowel before "-ous" is the same bare, never-reduced
+  IY the "-y" row above uses, so the whole ending is just `^AOE/^US` struck in sequence — no new
+  entry needed. Where there's no extra vowel (*gorgeous*, *courageous*, *religious*), it's plain
+  "-ous", `^US`, on its own.
+- **`-graphy`/`-ography`** (*biography*, *photography*, *geography*, *calligraphy*,
+  *choreography*) is not here: the schwa right before "-graphy" (the "ra" of "biogra-phy") takes a
+  vowel key that depends on incidental spelling elsewhere in the word (`AH` vs the spelled `AH.o`
+  variant — confirmed by comparing the real generator's own continuation strokes for several of
+  these words), not a fixed property of the suffix the way every other entry in this file is. A
+  standalone stroke can't know that in advance, so this one stays per-word, through the normal
+  rules, rather than a stroke here.
