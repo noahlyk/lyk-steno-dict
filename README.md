@@ -19,7 +19,7 @@ once would be.
 <!-- lyk:overall-table:start -->
 | Theory | Keys/Stroke, weighted by how often each word is said |
 |---|---|
-| Lyk | 3.41 |
+| Lyk | 3.40 |
 | Plover | 3.51 |
 | Lapwing | 3.93 |
 <!-- lyk:overall-table:end -->
@@ -110,10 +110,10 @@ they put on a continuation stroke, which the join key replaces) for:
 <!-- lyk:score-table:start -->
 | Syllables | Same as Plover or Lapwing | Plover | Lapwing | Keys/Stroke (Lyk) | Keys/Stroke (Plover) | Keys/Stroke (Lapwing) |
 |---|---|---|---|---|---|---|
-| 1 | 90% | 78% | 83% | 5.69 | 5.66 | 5.83 |
-| 2 | 59% | 45% | 52% | 5.68 | 4.93 | 5.27 |
-| 3 | 38% | 26% | 32% | 5.33 | 4.80 | 5.14 |
-| 4+ | 23% | 17% | 18% | 5.35 | 4.97 | 5.22 |
+| 1 | 90% | 78% | 83% | 5.67 | 5.66 | 5.83 |
+| 2 | 59% | 45% | 52% | 5.67 | 4.93 | 5.27 |
+| 3 | 38% | 26% | 32% | 5.25 | 4.80 | 5.14 |
+| 4+ | 23% | 17% | 18% | 5.26 | 4.97 | 5.22 |
 <!-- lyk:score-table:end -->
 
 "Keys/Stroke" above counts every distinct word once, regardless of how rare it is. The same
@@ -125,8 +125,8 @@ of very common words dominate it and a long tail of rare ones barely move it:
 |---|---|---|---|
 | 1 | 3.01 | 3.16 | 3.58 |
 | 2 | 4.83 | 4.70 | 5.00 |
-| 3 | 4.93 | 4.93 | 5.25 |
-| 4+ | 5.17 | 5.24 | 5.50 |
+| 3 | 4.90 | 4.93 | 5.25 |
+| 4+ | 5.12 | 5.24 | 5.50 |
 <!-- lyk:usage-table:end -->
 
 One-syllable words drop sharply under this weighting for every theory, not just Lyk, because a
@@ -169,7 +169,7 @@ Longer words differ mostly where Plover and Lapwing have a brief, and where Lyk 
 
 | | Strokes | Keys |
 |---|---|---|
-| Lyk | 1.033 | 3.576 |
+| Lyk | 1.033 | 3.565 |
 | Plover | 1.040 | 3.710 |
 | Lapwing | 1.041 | 4.106 |
 
@@ -178,10 +178,10 @@ By how common the word is (`build` prints this), keys per word:
 | Words | Share of all words said | Lyk | Plover | Lapwing |
 |---|---|---|---|---|
 | top 100 | 58% | 2.27 | 2.45 | 2.89 |
-| 100 to 1,000 | 28% | 4.67 | 4.81 | 5.17 |
-| 1,000 to 5,000 | 10% | 5.95 | 6.14 | 6.42 |
-| 5,000 to 20,000 | 4% | 8.01 | 7.47 | 7.88 |
-| 20,000+ | 1% | 10.09 | 8.92 | 9.30 |
+| 100 to 1,000 | 28% | 4.65 | 4.81 | 5.17 |
+| 1,000 to 5,000 | 10% | 5.93 | 6.14 | 6.42 |
+| 5,000 to 20,000 | 4% | 7.92 | 7.47 | 7.88 |
+| 20,000+ | 1% | 10.01 | 8.92 | 9.30 |
 
 The top thousand words are briefs in all three, which is why the dictionaries are close: the
 rules can only move the rest. Lyk now beats Plover through the top 1,000 words and roughly ties
@@ -192,8 +192,12 @@ That is with the join key on every continuation stroke counted, and with a Plove
 only when Lapwing has it too: Plover's `main.json` is full of misstrokes (`O` for *to*, `SP` for
 *and*) that would otherwise make it look a third of a key cheaper than it is. About 1,200 words
 end up with a star form because another word sounds the same and has the plain outline (`site`
-and `sight`, `don` and `done`); `build` lists the commonest. About 100 of the 100,000 words can't
-be written by these rules yet, nearly all names and interjections (`hm`, `schmidt`, `vlad`).
+and `sight`, `don` and `done`); `build` lists the commonest. About 500 of the 100,000 words can't
+be written by these rules yet, nearly all names and interjections (`hm`, `schmidt`, `vlad`). On
+top of all that, about 8,500 words also get a second, backup entry built from an already-placed
+shorter word's own outline plus whatever sounds are left over (`build`'s own outline plus a
+continuation stroke also reaches `building`, whether or not that agrees with `building`'s own
+cheapest outline) — see [syllables & folding](docs/syllables.md) for the rule.
 
 These numbers move whenever a brief or suffix is added — see [the docs](docs/README.md) for the
 rule, and run `cargo run --release -- score --check-readme` before committing a rules change

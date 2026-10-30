@@ -80,7 +80,7 @@ pub fn run(setup: &Setup, briefs: &Briefs, common: usize, max_words: usize) -> R
     println!("\"{quote}\"\n  — {author}\n");
 
     let generated = generate::generate(setup, briefs, common)?;
-    let lyk = generate::cheapest(&generated);
+    let lyk = generate::cheapest(&generated.entries);
 
     let rows: Vec<(String, String, String, String)> = quote
         .split_whitespace()

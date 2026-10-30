@@ -18,4 +18,40 @@ final `a` is a syllable of its own (*china* KHAOEU/+TPHA). Suffix clusters both 
 are rules: `-ment` -PLT, `-tion` -GS, `-ting` -GT, `-ding` -GD, and Plover's F for an S before
 another consonant (*castle* KAFL, *lesson* HREFPB).
 
+**Backup entries: a shorter word's own outline, plus whatever is left over.** The fold above only
+ever happens to keep a word consistent with a shorter relative when cramming everything onto one
+stroke isn't physically possible — *breaking* keeps *break*'s own `PWRAEUBG` only because `PWRAEUBG`
+plus a second "k" has nowhere to go; *building* has no such excuse, so its own cheapest outline is
+the fused `PWEULGD`, unrelated to *build*'s own `PWEULD`. A separate, later pass in `generate()`
+fixes this on purpose instead of by accident: for every word, if its last syllable is a reduced
+syllable that could be struck as a standalone continuation stroke on its own ([`Rules::suffix_split`
+in `src/rules.rs`]), and the sounds left over exactly match some other already-placed word's own
+pronunciation, that word's own real outline plus the continuation stroke is added as a *second*,
+additional entry — `build`'s `PWEULD` plus `+-G` also reaches *building*, whether or not that agrees
+with *building*'s own cheapest outline above. This never changes which outline wins as a word's own
+primary (shown by `explain` and used everywhere else); it only ever adds an extra way in, so a
+learner who knows the stem and the ending can always reach the word that way too.
+
+The same pass also runs the other way, for a leading sound in front of a shorter word's own
+*exact* pronunciation rather than a trailing one (`never` = the extra sound "N" in front of
+*ever*'s own exact sounds `EFR`). Since the join key only ever continues a stroke forward, this
+direction has to land on the *same* stroke as the matched word's own first one — the leading
+sound's own keys folded onto it, the same way a prefix with its own fixed keys already does (see
+[prefixes](prefixes.md)). When the leading sound's keys collide with one the matched word's first
+stroke already uses, this can't rescue the word at all (`unclear` needs `un-`'s own `TPH`, which
+shares an `H` with *clear*'s own "cl" onset cluster `KHR`) — skipped, not forced, a real structural
+limit of a theory where nothing can precede a stroke, only follow one.
+
+Neither direction requires the match to *mean* anything: `doctor`'s own sounds happen to be exactly
+`docked`'s plus an "-er", and `crash`'s are exactly a "k" in front of `rash`'s — coincidences with
+no relation to either word's own sense, reused anyway, the same way a brief never needed one either
+(see [the main README](../README.md#where-lyk-stands)). When more than one already-placed word
+ties on sound alone (`build` and `billed` are exact homophones), the word's own *spelling* breaks
+the tie if it can — `building` starts with `build`, not `billed` — the same way spelling already
+settles a tie between words that sound alike elsewhere in this theory (see
+[spelling disambiguation](spelling.md)); if spelling doesn't settle it either, the word is left
+alone rather than guessed at. A collision with an outline something else already has is skipped and
+counted (`build`'s own report line), never a hard failure, since this is a best-effort pass over
+the whole dictionary rather than an explicit, human-authored override.
+
 Next: **[when two words sound the same](collisions.md)**.

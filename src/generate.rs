@@ -70,6 +70,11 @@ pub enum Origin {
     Alternate,
     /// The ladder step that settled a clash: 1 is the star on the first stroke
     Ladder(u8),
+    /// An already-placed shorter word's own outline, plus a bare continuation stroke for
+    /// whatever trailing sounds are left over — struck on top of however the word is actually
+    /// briefed or folded, so a learner who knows the stem and the ending can always reach the
+    /// word that way too (see the backup-entry pass in [`generate`]).
+    Backup,
 }
 
 pub struct Entry {
@@ -83,6 +88,28 @@ pub struct Entry {
 pub struct Generated {
     pub entries: Vec<Entry>,
     pub unresolved: Vec<String>,
+    /// A backup entry (see [`Origin::Backup`]) whose composed outline another entry already had.
+    pub backup_skipped: usize,
+}
+
+/// Among words that all share one exact pronunciation, the one whose own spelling also agrees
+/// with `word`'s at the expected boundary — resolving an ambiguity the sounds alone can't (two
+/// homophones, like `build`/`billed`, sharing the stem sounds `building` needs) the same way
+/// spelling already breaks a tie between words that sound alike elsewhere in this theory (see
+/// `docs/spelling.md`). Sound is still what found these candidates in the first place; spelling
+/// only ever narrows a tie between them, never widens the search. `None` if nobody's spelling
+/// agrees, or if more than one still does.
+fn spelled_stem<'a>(word: &str, stems: &[&'a str], boundary: fn(&str, &str) -> bool) -> Option<&'a str> {
+    match *stems {
+        [stem] => Some(stem),
+        _ => {
+            let matches: Vec<&'a str> = stems.iter().copied().filter(|s| boundary(word, s)).collect();
+            match matches[..] {
+                [stem] => Some(stem),
+                _ => None,
+            }
+        }
+    }
 }
 
 /// The shortest outline (fewest strokes, then fewest keys) from a list.
@@ -594,16 +621,136 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
             }
         }
     }
+
+    // Backup stem+suffix entries: purely additive, and never touches a word's own outline above.
+    // For every word whose trailing syllable is a clean, reduced standalone continuation stroke
+    // (`Rules::suffix_split`), if the sounds left over exactly match one other already-placed
+    // word's own pronunciation, add a second entry built from that word's own real outline plus
+    // the continuation stroke — so a learner who knows the stem and the ending can always reach
+    // the word that way too, whether or not it agrees with the word's own cheapest outline above
+    // (`build`'s `PWEULD` plus the "-ing" stroke reaches `building`, whether or not `building`'s
+    // own cheapest outline happens to be the fused `PWEULGD`). A collision here is skipped and
+    // counted, never a hard failure, since this is a best-effort pass over the whole dictionary,
+    // not an explicit human-authored override. Run after every word above already has its final
+    // outline, so a stem is always looked up in its own already-settled form.
+    // A standalone suffix's own entry (`rules/suffixes.toml`) is a continuation-stroke shape, not
+    // a real word's own outline — using one as a stem here would carry its join key onto
+    // whatever gets composed from it (`ed`'s own entry is the bare continuation `+-D`, the "-ed"
+    // stroke struck on its own), so those are excluded from standing in as a stem entirely.
+    let mut word_outline: HashMap<String, Vec<Stroke>> = HashMap::new();
+    for entry in entries.iter().filter(|e| e.origin != Origin::Suffix) {
+        let cost = (entry.outline.len(), keys(&entry.outline));
+        match word_outline.get(&entry.word) {
+            Some(current) if (current.len(), keys(current)) <= cost => {}
+            _ => {
+                word_outline.insert(entry.word.clone(), entry.outline.clone());
+            }
+        }
+    }
+    let mut by_sounds: HashMap<&[String], Vec<&str>> = HashMap::new();
+    for word in word_outline.keys() {
+        if let Some(sounds) = setup.pron.get(word.as_str()).and_then(|prons| prons.first()) {
+            by_sounds.entry(sounds.as_slice()).or_default().push(word.as_str());
+        }
+    }
+    let mut backup_skipped = 0usize;
+    for word in word_outline.keys().cloned().collect::<Vec<_>>() {
+        let Some(sounds) = setup.pron.get(&word).and_then(|prons| prons.first()) else {
+            continue;
+        };
+        let Some((split, bare)) = setup.rules.suffix_split(&word, sounds) else {
+            continue;
+        };
+        let Some(stems) = by_sounds.get(&sounds[..split]) else {
+            continue;
+        };
+        // More than one already-placed word with that exact pronunciation (`build`/`billed`):
+        // spelling breaks the tie (`building` starts with `build`, not `billed`) if it can.
+        let Some(stem) = spelled_stem(&word, stems, |w, s| w.starts_with(s)) else {
+            continue;
+        };
+        if stem == word {
+            continue;
+        }
+        let mut composed = word_outline[stem].clone();
+        composed.push(bare);
+        setup.rules.joined(&mut composed);
+        if !setup.rules.matches_real_consonants(&composed, &word, sounds) {
+            continue;
+        }
+        let text = render_outline(&composed);
+        if taken.contains_key(&text) {
+            backup_skipped += 1;
+            continue;
+        }
+        taken.insert(text, word.clone());
+        entries.push(Entry {
+            word,
+            outline: composed,
+            origin: Origin::Backup,
+            lost_to: None,
+        });
+    }
+
+    // Backup entries, prefix direction: a word's sounds ending with another already-placed
+    // word's full sounds, with one or more extra leading consonant sounds in front (`ever` ->
+    // `never`, the extra sound "N"). Composed onto the *same* stroke as the matched word's own
+    // first stroke, since lyk's join key only ever continues a stroke forward, never backward: a
+    // continuation stroke can follow a stem, but nothing can precede one. When the leading
+    // sounds' own keys overlap a key the matched word's first stroke already uses, this
+    // direction simply can't rescue the word (`unclear` needs `un-`'s own `TPH`, which shares an
+    // `H` with `clear`'s own "cl" onset cluster `KHR`) — skipped, not forced; this is a real,
+    // structural gap in the theory, not a bug in this pass.
+    for word in word_outline.keys().cloned().collect::<Vec<_>>() {
+        let Some(sounds) = setup.pron.get(&word).and_then(|prons| prons.first()) else {
+            continue;
+        };
+        let Some((split, stem)) = (1..sounds.len().min(4)).find_map(|n| {
+            let stems = by_sounds.get(&sounds[n..])?;
+            let stem = spelled_stem(&word, stems, |w, s| w.ends_with(s))?;
+            (stem != word).then_some((n, stem))
+        }) else {
+            continue;
+        };
+        let Some(leading) = setup.rules.prefix_keys(&word, sounds, split) else {
+            continue;
+        };
+        let Some(&target_first) = word_outline[stem].first() else {
+            continue;
+        };
+        if leading.0 & target_first.0 != 0 {
+            continue;
+        }
+        let mut composed = word_outline[stem].clone();
+        composed[0] = Stroke(leading.0 | target_first.0);
+        if !setup.rules.matches_real_consonants(&composed, &word, sounds) {
+            continue;
+        }
+        let text = render_outline(&composed);
+        if taken.contains_key(&text) {
+            backup_skipped += 1;
+            continue;
+        }
+        taken.insert(text, word.clone());
+        entries.push(Entry {
+            word,
+            outline: composed,
+            origin: Origin::Backup,
+            lost_to: None,
+        });
+    }
+
     Ok(Generated {
         entries,
         unresolved,
+        backup_skipped,
     })
 }
 
-/// Each word's cheapest outline (fewest strokes, then fewest keys) from a generated dictionary.
-pub fn cheapest(generated: &Generated) -> HashMap<&str, &[Stroke]> {
+/// Each word's cheapest outline (fewest strokes, then fewest keys) among a list of entries.
+pub fn cheapest(entries: &[Entry]) -> HashMap<&str, &[Stroke]> {
     let mut best: HashMap<&str, &[Stroke]> = HashMap::new();
-    for entry in &generated.entries {
+    for entry in entries {
         let cost = |o: &[Stroke]| (o.len(), keys(o));
         match best.get(entry.word.as_str()) {
             Some(current) if cost(current) <= cost(&entry.outline) => {}
@@ -664,6 +811,10 @@ pub fn build(
     println!(
         "  words the rules could not place: {}",
         generated.unresolved.len()
+    );
+    println!(
+        "  backup entries skipped as collisions: {}",
+        generated.backup_skipped
     );
     let sample: Vec<String> = generated
         .unresolved

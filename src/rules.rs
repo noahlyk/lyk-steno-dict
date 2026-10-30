@@ -847,6 +847,52 @@ impl Rules {
         Some(Stroke(onset.0 | coda.0))
     }
 
+    /// Whether a word's own last syllable is a reduced syllable that could be struck as a
+    /// standalone continuation stroke on its own — the same split [`Self::strokes_for`] already
+    /// falls back to when folding it onto one stroke doesn't fit (`ended` EPBD/+-D, `breaking`
+    /// PWRAEUBG/+-G), computed here unconditionally instead of only when that fold fails. `None`
+    /// for a one-syllable word (nothing to split), when the last syllable isn't reduced, or when
+    /// it has no bare continuation stroke of its own.
+    ///
+    /// Returns the index into `sounds` where the stem ends (the last syllable's own onset, if it
+    /// has one, counts as part of the stem: a standalone suffix never has an onset of its own,
+    /// the same convention `rules/suffixes.toml` already uses, so those sounds belong to
+    /// whichever word they'd actually be pronounced with) and the bare (no join key) stroke the
+    /// trailing syllable's vowel and coda alone would be struck as.
+    pub fn suffix_split(&self, word: &str, sounds: &[String]) -> Option<(usize, Stroke)> {
+        let labelled = self.label(word, sounds);
+        let syllables = self.syllables(&labelled)?;
+        if syllables.len() < 2 {
+            return None;
+        }
+        let last = syllables.last()?;
+        if !self.is_reduced(last) {
+            return None;
+        }
+        let suffix = Syllable {
+            onset: Vec::new(),
+            vowel: last.vowel.clone(),
+            coda: last.coda.clone(),
+        };
+        let stroke = self.continuation(&suffix)?;
+        Some((sounds.len() - 1 - last.coda.len(), stroke))
+    }
+
+    /// The keys one or more leading consonant sounds take through the onset tables, for a prefix
+    /// found by an exact match against another already-placed word's own trailing pronunciation
+    /// (`never`'s leading "N" in front of `ever`'s own exact sounds) rather than through syllable
+    /// analysis the way [`Self::suffix_split`] finds a trailing one. The caller already knows
+    /// where the split falls; this only answers what the leading sounds themselves would be
+    /// struck as. `None` for no leading sounds at all, or when they don't fit together in one
+    /// stroke's own steno order.
+    pub fn prefix_keys(&self, word: &str, sounds: &[String], split: usize) -> Option<Stroke> {
+        if split == 0 {
+            return None;
+        }
+        let labelled = self.label(word, sounds);
+        Self::consonants(&labelled[..split], &self.onset, &self.onset_cluster, false)
+    }
+
     /// The prefix a word starts with, if the rules write one with fixed keys: the keys and how
     /// many sounds they stand for.
     fn prefix(&self, word: &str, sounds: &[String]) -> Option<(Stroke, usize)> {

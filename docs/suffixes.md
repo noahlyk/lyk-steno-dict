@@ -80,6 +80,19 @@ continuations, each one still just a syllable through the same rule.
 | `+U/+SEU` | -cy/-sy | *priva-cy*, *fanta-sy*, *poli-cy*, *democra-cy* — the same bare-AH first stroke as "-ity" (two different suffixes may share an opening stroke; only the whole outline has to stay distinct), then S + the "-y" vowel kept |
 | `+U/+TPAOEU` | -ify/-fy | *clar-ify*, *simpl-ify*, *ident-ify* — the same bare-AH first stroke again, then F + AY kept (AY never reduces, same as "-ize") |
 
+## Backup stem+suffix entries
+
+This table isn't only a reference for striking a suffix on its own — a later pass in `generate()`
+uses it, in spirit, to add a *second* dictionary entry wherever a word's own trailing syllable
+could be struck as a standalone continuation stroke and the sounds in front of it exactly match
+some other already-placed word's own pronunciation: `build`'s own outline plus `+-G` also reaches
+*building*, whether or not that agrees with *building*'s own cheapest outline. See
+**[syllables & folding](syllables.md)** for the full rule, both directions it runs in, and its
+known limits. Only **single-stroke** suffixes above take part in this — the two-syllable table
+just above (`-ism`, `-ary`/`-ery`/`-ory`, `-ical`, `-logy`, `-ity`/`-ety`, `-cy`/`-sy`,
+`-ify`/`-fy`) isn't matched by it yet, since recognising a word's last *two* syllables together as
+one of these needs its own check, not a straightforward extension of the one-syllable case.
+
 ## Not yet covered
 
 - **`-ious`/`-eous`** (*curious*, *serious*, *various*, *obvious*, *previous*, *hideous*) already
