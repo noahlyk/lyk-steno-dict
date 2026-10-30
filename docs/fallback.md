@@ -81,5 +81,5 @@ word, even though direct dictionary lookups of an already-built multi-stroke ent
 `WORBG/+-G`) would still work. This is why `cargo run -- plugin` must be regenerated and
 redeployed any time `Stroke::JOIN`'s bit position changes, not just when a rule table does.
 
-This is the last chapter of the theory itself. Next: **[where lyk stands](../README.md#where-lyk-stands)** —
-the benchmarks, a measured result of everything above rather than a rule of its own.
+Next: **[spelling mode](spelling-mode.md)** — the same `+`-joined-run idea reused for a word with
+no pronunciation to resolve from at all.

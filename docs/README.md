@@ -34,6 +34,8 @@ learn the whole theory; come back here to jump to a specific chapter once you kn
     function keys, symbols, and OS-modifier chording, likewise reserved back in chapter 2.
 13. **[The fallback](fallback.md)** — what happens when a stroke misses every dictionary above
     outright, and how that same logic becomes keymux's WASM fallback plugin.
+14. **[Spelling mode](spelling-mode.md)** — a deliberate, letter-exact way to type a word with no
+    pronunciation to generate from at all, reusing the join key's own multi-stroke mechanism.
 
 The benchmarks come last, as a measured result of everything above rather than a rule of their
 own — and they already live on [the main README](../README.md#where-lyk-stands), not here: the one

@@ -25,12 +25,20 @@ impl Stroke {
     pub const RIGHT: u32 = mask(RIGHT, 22);
     /// The join key: the stroke continues the word before it. Written `+` before the keys.
     pub const JOIN: u32 = 1 << 23;
+    /// The spelling-mode marker: this stroke starts a run read letter-by-letter from
+    /// `rules/spelling.toml` instead of sounded out. Written `~` before the keys, only ever on
+    /// the first stroke of such a run — every stroke after it carries the ordinary join key
+    /// instead, the same way any other multi-stroke word continues. See `docs/spelling-mode.md`.
+    pub const SPELL: u32 = 1 << 24;
 
     /// Parse notation such as `KAT`, `-T` or `STPH*`. Numbers and a bare `#` are not supported.
     pub fn parse(text: &str) -> Option<Self> {
-        let (mut bits, text) = match text.strip_prefix('+') {
-            Some(rest) => (Self::JOIN, rest),
-            None => (0, text),
+        let (mut bits, text) = if let Some(rest) = text.strip_prefix('+') {
+            (Self::JOIN, rest)
+        } else if let Some(rest) = text.strip_prefix('~') {
+            (Self::SPELL, rest)
+        } else {
+            (0, text)
         };
         let mut cursor = 0usize;
         for c in text.bytes() {
@@ -42,7 +50,7 @@ impl Stroke {
             bits |= 1 << at;
             cursor = at + 1;
         }
-        (bits & !Self::JOIN != 0).then_some(Self(bits))
+        (bits & !(Self::JOIN | Self::SPELL) != 0).then_some(Self(bits))
     }
 
     /// The lowest key down, as an index in steno order.
@@ -74,6 +82,8 @@ impl fmt::Display for Stroke {
         let mut hyphen = !has_vowel;
         if self.0 & Self::JOIN != 0 {
             write!(f, "+")?;
+        } else if self.0 & Self::SPELL != 0 {
+            write!(f, "~")?;
         }
         for (index, &key) in KEYS.iter().enumerate() {
             if self.0 & (1 << index) == 0 {
@@ -119,6 +129,8 @@ mod tests {
             "U",
             "+-G",
             "+AOE",
+            "~S",
+            "~TKPW",
         ] {
             assert_eq!(Stroke::parse(text).unwrap().to_string(), text, "{text}");
         }
@@ -134,5 +146,17 @@ mod tests {
     #[test]
     fn keys_out_of_order_do_not_parse() {
         assert_eq!(Stroke::parse("TS-K"), None);
+    }
+
+    #[test]
+    fn the_spelling_marker_is_not_the_join_key() {
+        let spell = Stroke::parse("~S").unwrap();
+        let join = Stroke::parse("+S").unwrap();
+        assert_ne!(spell, join);
+        assert_eq!(spell.0 & Stroke::SPELL, Stroke::SPELL);
+        assert_eq!(spell.0 & Stroke::JOIN, 0);
+        // A bare marker with no keys down is as meaningless as a bare join key alone
+        assert_eq!(Stroke::parse("~"), None);
+        assert_eq!(Stroke::parse("+"), None);
     }
 }

@@ -37,7 +37,10 @@ Each letter is its own steno chord, the same ones Plover's own fingerspelling di
 (`A` = `a`, `PW` = `b`, `KR` = `c`, `TK` = `d`, `TKPW` = `g`, `SKWR` = `j`, `STKPW` = `z`, ...),
 struck with a modifier and the `LGTS` ender: `PW-RLGTS` is Shift+B, `KR-RLGTS` is Shift+C. A few
 letters have a second, "magnum"-style chord as well (`AOEU` or `EU` both read as `i`; `SKWRAEU` or
-`SKWR` both read as `j`; `STKPWHR` or `STKPW` both read as `z`).
+`SKWR` both read as `j`; `STKPWHR` or `STKPW` both read as `z`). This same alphabet, stripped of
+the `LGTS` ender, seeds the letter table **[spelling mode](spelling-mode.md)** reads a
+no-pronunciation word back from — a different purpose (prose, not an OS keybinding), so it keeps
+only each letter's primary chord.
 
 ## Numbers and function keys
 
