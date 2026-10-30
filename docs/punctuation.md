@@ -9,7 +9,7 @@ This chapter is the actual content: what's in `rules/reserved/punctuation.json` 
 
 ## Punctuation (`rules/reserved/punctuation.json`)
 
-146 strokes, forked from Plover's own punctuation dictionary. Most marks have far more than one
+144 strokes, forked from Plover's own punctuation dictionary. Most marks have far more than one
 stroke because Plover's convention gives each mark several chords for several different contexts —
 struck plain, struck doubled, struck with a leading or trailing glue so it doesn't force an
 unwanted space, struck after a quote or before a parenthesis, and so on. A handful of the busiest
@@ -17,13 +17,22 @@ marks, by stroke count:
 
 | Mark | Strokes | A few of them |
 |---|---|---|
-| `.` | 32 | `-P`, `TP-P`, `P-FP`, `TPHR-FRPBLT` |
+| `.` | 30 | `-FP`, `TP-P`, `P-FP`, `TPHR-FRPBLT` |
 | `,` | 14 | `-RB`, `KW-BG`, `W-BG` |
 | `?` | 11 | `H-F`, `STP`, `STPH*` |
 | (word joiner, no space) | 5 | `SP`, `S-P`, `S*PS` |
 | `!` | 5 | `TP-BG`, `SKHAPL`, `STKPWHR-FPLT` |
 | `;` | 4 | `SP-PT`, `SKWR*RBGS` |
 | `:` | 3 | `STP-FPLT`, `STPH-FPLT` |
+
+Plover's own period dictionary hands it enough strokes that two of the bare, vowel-less ones —
+`-P` and `-PL` — were never missed when freed for briefs instead (see `rules/briefs.toml`'s `up`
+and `am`): a mark with 30 other ways to strike it doesn't need a short, phonetically obvious
+right-hand chord more than a word used in nearly every sentence does. `up`'s own brief had quietly
+lost `-P` to this same reservation for a long time with nothing printed to say so, silently falling
+back to the two-key `UP` the rules generate anyway — `generate::generate` now refuses to build at
+all if a `[word]`-named brief's own literal outline is already reserved, rather than letting that
+happen again unnoticed.
 
 Beyond the sentence-ending marks, the same file carries:
 

@@ -348,7 +348,25 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
         let outline = match source.as_str() {
             "plover" => plover.and_then(|o| best_brief(o, &setup.rules, word, sounds, &natural)),
             "lapwing" => lapwing.and_then(|o| best_brief(o, &setup.rules, word, sounds, &natural)),
-            explicit => parse_outline(explicit),
+            explicit => {
+                let outline = parse_outline(explicit)
+                    .with_context(|| format!("{word:?}'s brief {explicit:?} in rules/briefs.toml"))?;
+                let text = render_outline(&outline);
+                // A literal outline in `[word]` was looked at and picked by hand, unlike a
+                // `plover`/`lapwing` source's own collision-avoiding `best_brief` call above: if
+                // it's already spoken for, that is always a stale or wrong entry worth fixing in
+                // `rules/briefs.toml`, never something to fall back from silently. `up`'s own
+                // `"-P"` sat this way for a long time, unnoticed, quietly losing every build to
+                // `rules/reserved/punctuation.json`'s own `"-P"` and falling back to the
+                // two-key `UP` the rules generate anyway, with nothing printed to say so.
+                if let Some(holder) = taken.get(&text) {
+                    anyhow::bail!(
+                        "{word:?}'s brief ({explicit:?} in rules/briefs.toml) wants the outline \
+                         {text:?}, which {holder:?} already has"
+                    );
+                }
+                Some(outline)
+            }
         };
         // A word only one of them writes still gets its brief
         let outline = outline

@@ -19,7 +19,7 @@ once would be.
 <!-- lyk:overall-table:start -->
 | Theory | Keys/Stroke, weighted by how often each word is said |
 |---|---|
-| Lyk | 3.46 |
+| Lyk | 3.45 |
 | Plover | 3.51 |
 | Lapwing | 3.93 |
 <!-- lyk:overall-table:end -->
