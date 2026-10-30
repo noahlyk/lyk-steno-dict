@@ -144,12 +144,10 @@ fn tallies(setup: &Setup, briefs: &generate::Briefs, common: usize) -> Result<Ve
     // The real, brief-adjusted outline `build` would write for a word, cheapest first: matches
     // what ships, not just what the bare rules produce.
     let generated = generate::generate(setup, briefs, common)?;
-    let mut ours: HashMap<&str, (usize, u32)> = HashMap::new();
-    for entry in &generated.entries {
-        let cost = (entry.outline.len(), generate::keys(&entry.outline));
-        let best = ours.entry(entry.word.as_str()).or_insert(cost);
-        *best = (*best).min(cost);
-    }
+    let ours: HashMap<&str, (usize, u32)> = generate::cheapest(&generated.entries)
+        .into_iter()
+        .map(|(word, outline)| (word, (outline.len(), generate::keys(outline))))
+        .collect();
     let plover_cost = |word: &str| -> Option<(usize, u32)> {
         let outline = generate::shortest(setup.gold.plover.get(word)?)?;
         Some((outline.len(), generate::keys(&outline)))

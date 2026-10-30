@@ -169,7 +169,7 @@ Longer words differ mostly where Plover and Lapwing have a brief, and where Lyk 
 
 | | Strokes | Keys |
 |---|---|---|
-| Lyk | 1.033 | 3.566 |
+| Lyk | 1.033 | 3.569 |
 | Plover | 1.040 | 3.710 |
 | Lapwing | 1.041 | 4.106 |
 

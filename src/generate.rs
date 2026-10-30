@@ -754,9 +754,15 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
 }
 
 /// Each word's cheapest outline (fewest strokes, then fewest keys) among a list of entries.
+///
+/// A standalone suffix's own entry (`rules/suffixes.toml`) never counts, even when its own
+/// display text happens to also be a real word (`less`, `age`, `some`, `ism`, and 17 others): its
+/// outline is a continuation-stroke fragment that is never a word by itself when struck alone
+/// (the join key it carries refuses that, by design — see [the join key](../docs/join-key.md)),
+/// so it is never really "the outline" for that word even when it numerically looks cheapest.
 pub fn cheapest(entries: &[Entry]) -> HashMap<&str, &[Stroke]> {
     let mut best: HashMap<&str, &[Stroke]> = HashMap::new();
-    for entry in entries {
+    for entry in entries.iter().filter(|e| e.origin != Origin::Suffix) {
         let cost = |o: &[Stroke]| (o.len(), keys(o));
         match best.get(entry.word.as_str()) {
             Some(current) if cost(current) <= cost(&entry.outline) => {}
@@ -831,12 +837,10 @@ pub fn build(
     println!("    the commonest: {}", sample.join(", "));
 
     // Each word's cheapest outline here, and what Plover and Lapwing spend on the same word
-    let mut ours: HashMap<&str, (usize, u32)> = HashMap::new();
-    for entry in &generated.entries {
-        let cost = (entry.outline.len(), keys(&entry.outline));
-        let best = ours.entry(entry.word.as_str()).or_insert(cost);
-        *best = (*best).min(cost);
-    }
+    let ours: HashMap<&str, (usize, u32)> = cheapest(&generated.entries)
+        .into_iter()
+        .map(|(word, outline)| (word, (outline.len(), keys(outline))))
+        .collect();
     let cost_of = |outlines: Option<&Vec<String>>| {
         let outline = shortest(outlines?)?;
         Some((outline.len(), keys(&outline)))
@@ -974,4 +978,33 @@ pub fn build(
         );
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::stroke::parse_outline;
+
+    fn entry(word: &str, outline: &str, origin: Origin) -> Entry {
+        Entry {
+            word: word.to_owned(),
+            outline: parse_outline(outline).unwrap(),
+            origin,
+            lost_to: None,
+        }
+    }
+
+    #[test]
+    fn a_standalone_suffixs_own_entry_never_wins_cheapest_even_when_shorter() {
+        // "less" is both a real word (HRES, 4 keys) and the display text of the standalone
+        // "-less" suffix's own continuation stroke (+-LS, 2 keys) - a stroke that is never a
+        // word by itself when struck alone (see the join key), so it must never be picked as
+        // "the" outline for the real word just because it numerically looks cheaper.
+        let entries = vec![
+            entry("less", "+-LS", Origin::Suffix),
+            entry("less", "HRES", Origin::Rules),
+        ];
+        let best = cheapest(&entries);
+        assert_eq!(best.get("less").copied(), Some(&parse_outline("HRES").unwrap()[..]));
+    }
 }
