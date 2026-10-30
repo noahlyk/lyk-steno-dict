@@ -30,7 +30,15 @@
    wins when it's available (`good`'s brief is `AOD` — no attempt at its "g" sound at all, rather
    than the seven-key `TKPWAOD` completing it) — but either repair only exists because the word's
    own gold dictionary pointed at that sound to begin with; nothing is invented from nothing.
-   Fewest keys then picks among whichever candidates, original or repaired, are left.
+   Fewest keys then picks among whichever candidates, original or repaired, are left — except that
+   a *dropped* candidate (never a raw one) loses this tie-break if it lands exactly on the plain
+   outline of a different, commonly-known word that would otherwise have needed it (`fact` used to
+   drop its `K` entirely down to `TPAT`, exactly `fat`'s own plain outline, bumping `fat` onto the
+   starred `TPA*T` to make room). A rarer word losing its plain outline to a brief outright is this
+   whole mechanism's normal, accepted cost — that's what the star ladder is for — so this check
+   only looks at words inside the brief window itself (`briefs.count`) that are not themselves
+   landing a brief: a word briefed regardless of what it drops, like `a` pinned to `AEU`, was never
+   going to need its own plain reading (`A`) at all, so it does not count as a collision.
 
    The window itself (`count`) is a default for words nobody has looked at individually, not a
    ceiling: a word named explicitly in `[word]` gets a brief regardless of rank, the same way a

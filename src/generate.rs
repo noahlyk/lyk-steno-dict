@@ -111,24 +111,42 @@ fn best_brief(
     rules: &crate::rules::Rules,
     word: &str,
     sounds: &[String],
+    natural: &HashMap<String, &str>,
 ) -> Option<Vec<Stroke>> {
-    let candidates: Vec<Vec<Stroke>> = outlines
+    // Whether a candidate is one of the word's own gold outlines (never second-guessed by a
+    // collision below — a hand-picked Plover brief like "and"'s `SKP` is allowed to sit on
+    // whatever some other, unrelated word would have wanted by the plain rules; that trade is
+    // this whole mechanism's normal, accepted cost, not a bug) or this function's own synthesized
+    // drop repair (which is).
+    let candidates: Vec<(bool, Vec<Stroke>)> = outlines
         .iter()
         .filter_map(|o| parse_outline(o))
         .flat_map(|o| {
-            let repaired = rules.drop_fragments(&o, word, sounds);
-            std::iter::once(o).chain(repaired)
+            let repaired = rules.drop_fragments(&o, word, sounds).map(|d| (true, d));
+            std::iter::once((false, o)).chain(repaired)
         })
         .collect();
     candidates
         .into_iter()
-        .min_by_key(|o| {
+        .min_by_key(|(dropped, o)| {
+            // A *dropped* sound that happens to land exactly on a different word's own plain
+            // outline isn't a saving: it just hands that other word a ladder fight it would never
+            // otherwise have had, almost always a shorter, commoner word than the one being
+            // briefed (`fact` dropping its own `K` entirely used to take `fat`'s rightful,
+            // un-briefed `TPAT`). Only the synthesized drop candidate is checked — a raw gold
+            // outline colliding with another word is the ordinary, already-accepted case above,
+            // not this one. Checked after the key-count/fragment comparisons that matter when
+            // there's no such collision, so a candidate only pays this cost when it would
+            // otherwise have won anyway.
+            let collides = *dropped && natural.get(&render_outline(o)).is_some_and(|&owner| owner != word);
             (
                 o.len(),
                 !rules.matches_real_consonants(o, word, sounds),
+                collides,
                 keys(o),
             )
         })
+        .map(|(_, o)| o)
 }
 
 /// How many keys an outline takes to press.
@@ -247,6 +265,18 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
     let has_tiny_brief = |outlines: Option<&Vec<String>>| {
         outlines.and_then(|o| shortest(o)).is_some_and(|o| keys(&o) <= TINY_BRIEF_KEYS)
     };
+
+    // A dry run of the brief loop below, exactly as the original algorithm picks it (no collision
+    // awareness: an empty `natural` map never flags anything as colliding), to find which words
+    // actually end up relying on their own plain outline because nothing better came of their own
+    // brief attempt. Only those words are worth a different word paying extra keys to avoid
+    // colliding with below — a word that lands a brief of its own regardless (`a`, pinned to
+    // `AEU`) never needs its plain reading (`A`) at all, so it shouldn't block some other word
+    // from cleanly dropping a sound down to that same text (see `fact`'s own drop candidate `TPAT`
+    // falsely "colliding" with `a`'s unused plain reading before this check existed).
+    let empty_natural: HashMap<String, &str> = HashMap::new();
+    let mut baseline_taken = taken.clone();
+    let mut baseline_pinned: HashSet<&str> = HashSet::new();
     for (word, rank) in &words {
         let plover = setup.gold.plover.get(word.as_str());
         let lapwing = setup.gold.lapwing.get(word.as_str());
@@ -257,8 +287,67 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
         let sounds = &setup.pron[word.as_str()][0];
         let source = briefs.word.get(word.as_str()).unwrap_or(&briefs.default);
         let outline = match source.as_str() {
-            "plover" => plover.and_then(|o| best_brief(o, &setup.rules, word, sounds)),
-            "lapwing" => lapwing.and_then(|o| best_brief(o, &setup.rules, word, sounds)),
+            "plover" => plover.and_then(|o| best_brief(o, &setup.rules, word, sounds, &empty_natural)),
+            "lapwing" => lapwing.and_then(|o| best_brief(o, &setup.rules, word, sounds, &empty_natural)),
+            explicit => parse_outline(explicit),
+        };
+        let outline = outline
+            .or_else(|| {
+                setup
+                    .gold
+                    .plover
+                    .get(word.as_str())
+                    .and_then(|o| best_brief(o, &setup.rules, word, sounds, &empty_natural))
+            })
+            .or_else(|| {
+                setup
+                    .gold
+                    .lapwing
+                    .get(word.as_str())
+                    .and_then(|o| best_brief(o, &setup.rules, word, sounds, &empty_natural))
+            });
+        let Some(outline) = outline else { continue };
+        let text = render_outline(&outline);
+        if baseline_taken.contains_key(&text) {
+            continue;
+        }
+        baseline_taken.insert(text, (*word).clone());
+        baseline_pinned.insert(word.as_str());
+    }
+
+    // Every common-enough word's own outline by the plain rules, so a brief below can tell a
+    // genuine saving from one that only moves a collision onto a word a learner would also know
+    // (see `best_brief`). Limited to words inside the same "commonly known" window a brief itself
+    // uses (`briefs.count`) that the dry run above shows are NOT themselves landing a brief:
+    // losing a plain outline to a brief is this whole mechanism's normal, accepted cost for a rare
+    // word (that's what the ladder is for), so only a collision with a word that actually needs
+    // this outline is worth a brief paying extra keys to avoid. The commonest word keeps a
+    // contested outline, since `words` is already sorted by rank.
+    let mut natural: HashMap<String, &str> = HashMap::new();
+    for (word, rank) in &words {
+        if *rank >= briefs.count || baseline_pinned.contains(word.as_str()) {
+            continue;
+        }
+        if let Some(outline) = setup.pron[word.as_str()]
+            .iter()
+            .find_map(|sounds| setup.rules.outline(word, sounds))
+        {
+            natural.entry(render_outline(&outline)).or_insert(word.as_str());
+        }
+    }
+
+    for (word, rank) in &words {
+        let plover = setup.gold.plover.get(word.as_str());
+        let lapwing = setup.gold.lapwing.get(word.as_str());
+        let named = briefs.word.contains_key(word.as_str());
+        if *rank >= briefs.count && !has_tiny_brief(plover) && !has_tiny_brief(lapwing) && !named {
+            continue;
+        }
+        let sounds = &setup.pron[word.as_str()][0];
+        let source = briefs.word.get(word.as_str()).unwrap_or(&briefs.default);
+        let outline = match source.as_str() {
+            "plover" => plover.and_then(|o| best_brief(o, &setup.rules, word, sounds, &natural)),
+            "lapwing" => lapwing.and_then(|o| best_brief(o, &setup.rules, word, sounds, &natural)),
             explicit => parse_outline(explicit),
         };
         // A word only one of them writes still gets its brief
@@ -268,14 +357,14 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
                     .gold
                     .plover
                     .get(word.as_str())
-                    .and_then(|o| best_brief(o, &setup.rules, word, sounds))
+                    .and_then(|o| best_brief(o, &setup.rules, word, sounds, &natural))
             })
             .or_else(|| {
                 setup
                     .gold
                     .lapwing
                     .get(word.as_str())
-                    .and_then(|o| best_brief(o, &setup.rules, word, sounds))
+                    .and_then(|o| best_brief(o, &setup.rules, word, sounds, &natural))
             });
         let Some(outline) = outline else { continue };
         let text = render_outline(&outline);
