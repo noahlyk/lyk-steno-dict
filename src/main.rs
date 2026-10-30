@@ -252,16 +252,22 @@ fn main() -> Result<()> {
 /// Every file lyk's keymux config is made of, besides the two this binary generates fresh each
 /// time (the words dictionary and the fallback plugin): the reserved stroke tables this repo
 /// already tracks as its own source of truth (`rules/reserved/`), verbatim, under the numbered
-/// name keymux loads them by, plus the two pieces of generic keymux scaffolding (the regenerate
-/// script and the theory-name marker) every theory folder needs to be recognized and reloadable
-/// at all. Static, not derived from the rules, so `deploy` can rebuild the whole folder from
-/// nothing rather than silently dropping anything it doesn't happen to find already there.
+/// name keymux loads them by, plus the one piece of generic keymux scaffolding (the theory-name
+/// marker) every theory folder needs to be recognized and reloadable at all. Static, not derived
+/// from the rules, so `deploy` can rebuild the whole folder from nothing rather than silently
+/// dropping anything it doesn't happen to find already there.
+///
+/// `rules/reserved/emilys-modifiers.py` and its `regenerate.py` tool are deliberately left out of
+/// this list: keymux only ever reads the `.json` a `.py` dictionary already has to be converted
+/// to, and never runs the `.py` itself (see keymux's own `setup::LAPWING_FILES` comment — a `.py`
+/// "needs Plover's plugin runtime, so it isn't used here"). They stay in `rules/reserved/` as this
+/// repo's own source and dev tool for hand-editing that one file, not as something to ship into a
+/// live config: run `python3 rules/reserved/regenerate.py` there and commit the result if that
+/// file ever changes.
 const STATIC_FILES: &[(&str, &str)] = &[
     ("01-lyk-commands.json", include_str!("../rules/reserved/commands.json")),
     ("03-lyk-punctuation.json", include_str!("../rules/reserved/punctuation.json")),
     ("04-lyk-emilys-modifiers.json", include_str!("../rules/reserved/emilys-modifiers.json")),
-    ("04-lyk-emilys-modifiers.py", include_str!("../rules/reserved/emilys-modifiers.py")),
-    ("regenerate.py", include_str!("../rules/reserved/regenerate.py")),
     (".keymux-theory", "lyk\n"),
 ];
 
@@ -297,6 +303,16 @@ fn deploy(
         std::fs::write(&dest, content).with_context(|| dest.display().to_string())?;
         let written = std::fs::read_to_string(&dest).with_context(|| dest.display().to_string())?;
         anyhow::ensure!(written == *content, "{} differs after writing", dest.display());
+    }
+
+    // An earlier `deploy` shipped these two here by mistake (see `STATIC_FILES`'s own comment on
+    // why they never belonged in a live config); remove them if a past run already left them
+    // behind, rather than leaving dead files for `deploy` to never again mention or explain.
+    for stale in ["04-lyk-emilys-modifiers.py", "regenerate.py"] {
+        let path = to.join(stale);
+        if path.exists() {
+            std::fs::remove_file(&path).with_context(|| path.display().to_string())?;
+        }
     }
 
     println!(
