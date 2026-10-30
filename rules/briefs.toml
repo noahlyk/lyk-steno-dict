@@ -97,3 +97,34 @@ including = "plover"      # KHRUG vs. EUPB/KHRAOUGD
 include = "plover"        # KHRU vs. EUPB/KHRAOUD
 understanding = "plover"  # URBGD vs. URPBD/STAPBGD
 imagination = "plover"    # PHAEGS vs. EUPL/APBLG/TPHAEUGS
+
+# A second pass over `build`'s own "words that cost the most extra keys over plover" report:
+# every word below was outside the 1,500 window with a real, non-fragment gap of three keys or
+# more. Two of these (`subject`, `neighborhood`) show a smaller saving than Plover's own listed
+# outline promises, because that raw outline is itself a fragment of a real cluster this check
+# already rejects — the comment gives the fragment-safe outline this actually landed on, not
+# Plover's own, after the same repair every `plover`-sourced brief already goes through:
+easier = "plover"         # AO*ERS, 6 keys, vs. the rules' 13-key AOE/STKPWAOER
+female = "plover"         # TPAEL, 5 keys, vs. the rules' 12-key TPAOE/PHAEUL
+realized = "plover"       # AEFLD, 5 keys, vs. the rules' 12-key RAE/HRAOEUFD
+subject = "plover"        # SUT, 3 keys (Plover's own SUBT is a fragment of -BGT's "ct"; dropped
+                           # rather than completed) vs. the rules' 11-key SUB/SKWREBGT
+ideas = "plover"          # KWR-DZ, 5 keys, vs. the rules' 10-key AOEU/TKAEZ
+incredible = "plover"     # TPHEBL, 6 keys, vs. the rules' 11-key EUPB/KREBLD
+performance = "plover"    # P-FRPBS, 6 keys, vs. the rules' 14-key PER/TPORPL/-PBS
+perfectly = "plover"      # P-FL, 3 keys, vs. the rules' 8-key PEFRBLGT
+audience = "plover"       # AUPBS, 5 keys, vs. the rules' 10-key AUD/AOEPBS
+obvious = "plover"        # OFB, 3 keys, vs. the rules' 9-key OB/SRAOES
+neighborhood = "plover"   # AOTD, 4 keys (Plover's own TPAOTD is a fragment of the "n" onset
+                           # TPH; dropped rather than completed) vs. the rules' 13-key
+                           # TPHAEUB/-R/HAOD
+investigating = "plover"  # SREGT/-G, 6 keys, vs. the rules' 20-key EUPB/SREFT/TKPWAEUGT
+suggest = "plover"        # SUG, 3 keys, vs. the rules' 8-key SKWR*EFT
+gentleman = "plover"      # SKWRA*L, 7 keys, vs. the rules' 13-key SKWREPBLT/PH-PB
+object = "plover"         # O*, 2 keys, vs. the rules' 11-key OB/SKWREBGT
+remind = "plover"         # R*EUPBD, 7 keys, vs. the rules' 12-key RE/PHAOEUPBD
+confused = "plover"       # KAOUFD, 6 keys, vs. the rules' 12-key KOPB/TPAOUFD
+amount = "plover"         # ALT, 3 keys, vs. the rules' 9-key A/PHOUPBT
+agency = "plover"         # AGT/SEU, 6 keys, vs. the rules' 14-key AEUPBLG/-PB/SEU
+license = "plover"        # HR-PB, 4 keys, vs. the rules' 10-key HRAOEUFPBS
+remain = "plover"         # RAEUL, 5 keys, vs. the rules' 10-key RE/PHAEUPB
