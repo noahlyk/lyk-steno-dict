@@ -81,6 +81,8 @@ cargo run --release -- score               # how often the rules match Plover or
 cargo run --release -- score --check-readme   # do this README's tables still match?
 cargo run --release -- build               # briefs + rules -> out/lyk.json, with the cost
 cargo run --release -- plugin              # generate keymux's WASM fallback plugin from the rules
+cargo run --release -- deploy              # build + plugin, copied straight into keymux's live config
+                                            #   (~/.config/keymux/steno/lyk by default; override with --to)
 cargo run --release -- explain moon        # which rules wrote a word, next to Plover and Lapwing
 cargo run --release -- mismatches --syllables 2 --after 500    # where the rules differ
 cargo run --release -- learn               # which keys Plover and Lapwing use for each sound group

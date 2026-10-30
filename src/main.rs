@@ -138,6 +138,19 @@ enum Command {
         #[arg(long)]
         briefs: Option<PathBuf>,
     },
+    /// Build the dictionary and the plugin, then copy both straight into the live keymux config:
+    /// the one command for everything `build` and `plugin` otherwise leave as a manual copy/paste
+    Deploy {
+        /// Where keymux's lyk config lives
+        #[arg(long, default_value = "~/.config/keymux/steno/lyk")]
+        to: PathBuf,
+        /// Words to cover, most common first
+        #[arg(long, default_value_t = 100_000)]
+        common: usize,
+        /// Briefs to use instead of the built-in ones
+        #[arg(long)]
+        briefs: Option<PathBuf>,
+    },
 }
 
 fn main() -> Result<()> {
@@ -225,7 +238,54 @@ fn main() -> Result<()> {
             common,
             briefs,
         } => run_lookup(&setup, query, *common, briefs.as_deref()),
+        Command::Deploy { to, common, briefs } => {
+            let setup = setup(Some(*common))?;
+            let briefs = match briefs {
+                Some(path) => generate::Briefs::load(path)?,
+                None => generate::Briefs::built_in()?,
+            };
+            deploy(&setup, &briefs, *common, cli.rules.as_deref(), to)
+        }
     }
+}
+
+/// `build` and `plugin`, straight into keymux's live config: the words file and the fallback
+/// plugin it would otherwise take two commands and two manual copies to update.
+fn deploy(
+    setup: &analysis::Setup,
+    briefs: &generate::Briefs,
+    common: usize,
+    rules_path: Option<&Path>,
+    to: &Path,
+) -> Result<()> {
+    let to = expand_home(to)?;
+    std::fs::create_dir_all(&to).with_context(|| to.display().to_string())?;
+
+    let words_out = PathBuf::from("out/lyk.json");
+    generate::build(setup, briefs, common, &words_out, None)?;
+    let plugin_out = PathBuf::from("out/lyk-orthographic-fallback.rs");
+    write_plugin(rules_path, &plugin_out)?;
+
+    let words_to = to.join("02-lyk-words.json");
+    let plugin_to = to.join("05-lyk-orthographic-fallback.rs");
+    std::fs::copy(&words_out, &words_to).with_context(|| words_to.display().to_string())?;
+    std::fs::copy(&plugin_out, &plugin_to).with_context(|| plugin_to.display().to_string())?;
+
+    for (from, dest) in [(&words_out, &words_to), (&plugin_out, &plugin_to)] {
+        let (a, b) = (std::fs::read(from)?, std::fs::read(dest)?);
+        anyhow::ensure!(a == b, "{} and {} differ after copying", from.display(), dest.display());
+    }
+    println!("deployed to {}", to.display());
+    Ok(())
+}
+
+/// A leading `~/` or bare `~`, expanded against `$HOME`; any other path is returned as-is.
+fn expand_home(path: &Path) -> Result<PathBuf> {
+    let Ok(rest) = path.strip_prefix("~") else {
+        return Ok(path.to_path_buf());
+    };
+    let home = std::env::var("HOME").context("$HOME is not set, and the path starts with ~")?;
+    Ok(PathBuf::from(home).join(rest))
 }
 
 /// The one lookup, forward or backward: see `reverse::classify`.
