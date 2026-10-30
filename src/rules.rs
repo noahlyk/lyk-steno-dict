@@ -1117,6 +1117,17 @@ impl Rules {
     /// which "it" doesn't start with) isn't this — it shares no keys with "it" having no onset at
     /// all, so there's nothing to fragment, and it's exactly as learnable as any other memorized
     /// brief, nothing new to work out. Only a sound's *own* keys, partly present, are rejected.
+    ///
+    /// Known blind spot: this only ever checks the *first* syllable's onset and the *last*
+    /// syllable's coda, so a multi-key cluster belonging to a syllable strictly in between is
+    /// invisible to it. If that middle cluster happens to share a key with the first syllable's
+    /// own (often-reduced) onset, a candidate that correctly keeps the whole middle cluster can
+    /// still be flagged and "repaired" into dropping part of it — not a fragment of the sound it
+    /// was actually attempting. `district`'s `TR-T` (the real "tr" of its second syllable) and
+    /// `describe`'s `SKREU` (the real "skr" of its second syllable) both hit this, because each
+    /// word's own first sound reduces to a "d" sharing a key with that later cluster; see
+    /// `rules/briefs.toml`'s own note on them for the literal overrides this forced. Worth fixing
+    /// properly — this generalizes to any multi-syllable word, not just those two.
     pub fn matches_real_consonants(&self, outline: &[Stroke], word: &str, sounds: &[String]) -> bool {
         let Some(syllables) = self.syllables(&self.label(word, sounds)) else {
             return true;

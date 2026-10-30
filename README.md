@@ -112,7 +112,7 @@ they put on a continuation stroke, which the join key replaces) for:
 |---|---|---|---|---|---|---|
 | 1 | 90% | 78% | 83% | 5.69 | 5.66 | 5.83 |
 | 2 | 59% | 45% | 52% | 5.68 | 4.93 | 5.27 |
-| 3 | 38% | 26% | 32% | 5.32 | 4.80 | 5.14 |
+| 3 | 38% | 26% | 32% | 5.33 | 4.80 | 5.14 |
 | 4+ | 23% | 17% | 18% | 5.35 | 4.97 | 5.22 |
 <!-- lyk:score-table:end -->
 
@@ -124,8 +124,8 @@ of very common words dominate it and a long tail of rare ones barely move it:
 | Syllables | Keys/Stroke (Lyk, by frequency) | Keys/Stroke (Plover, by frequency) | Keys/Stroke (Lapwing, by frequency) |
 |---|---|---|---|
 | 1 | 3.01 | 3.16 | 3.58 |
-| 2 | 4.84 | 4.70 | 5.00 |
-| 3 | 4.92 | 4.93 | 5.25 |
+| 2 | 4.83 | 4.70 | 5.00 |
+| 3 | 4.93 | 4.93 | 5.25 |
 | 4+ | 5.17 | 5.24 | 5.50 |
 <!-- lyk:usage-table:end -->
 
@@ -169,7 +169,7 @@ Longer words differ mostly where Plover and Lapwing have a brief, and where Lyk 
 
 | | Strokes | Keys |
 |---|---|---|
-| Lyk | 1.034 | 3.582 |
+| Lyk | 1.033 | 3.576 |
 | Plover | 1.040 | 3.710 |
 | Lapwing | 1.041 | 4.106 |
 
@@ -179,7 +179,7 @@ By how common the word is (`build` prints this), keys per word:
 |---|---|---|---|---|
 | top 100 | 58% | 2.27 | 2.45 | 2.89 |
 | 100 to 1,000 | 28% | 4.67 | 4.81 | 5.17 |
-| 1,000 to 5,000 | 10% | 6.01 | 6.14 | 6.42 |
+| 1,000 to 5,000 | 10% | 5.95 | 6.14 | 6.42 |
 | 5,000 to 20,000 | 4% | 8.01 | 7.47 | 7.88 |
 | 20,000+ | 1% | 10.09 | 8.92 | 9.30 |
 

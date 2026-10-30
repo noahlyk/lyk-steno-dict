@@ -128,3 +128,60 @@ amount = "plover"         # ALT, 3 keys, vs. the rules' 9-key A/PHOUPBT
 agency = "plover"         # AGT/SEU, 6 keys, vs. the rules' 14-key AEUPBLG/-PB/SEU
 license = "plover"        # HR-PB, 4 keys, vs. the rules' 10-key HRAOEUFPBS
 remain = "plover"         # RAEUL, 5 keys, vs. the rules' 10-key RE/PHAEUPB
+
+# A third pass, same report, after the brief-retry fix in `best_brief` (see `generate.rs`)
+# reshuffled who wants what. All of these are a plain `best_brief` pick like every word above,
+# except `district` and `describe`, noted below:
+nowhere = "plover"        # TPHO*ER, 7 keys, vs. the rules' 11-key TPHOE/WAEUR
+began = "plover"          # TKPWAPB, 7 keys, vs. the rules' 11-key PWE/TKPWAPB
+season = "plover"         # S-PB, 3 keys, vs. the rules' 7-key SAOEFPB
+issue = "plover"          # *URB, 4 keys, vs. the rules' 8-key EURB/AOU
+unit = "plover"           # AOUBT, 5 keys, vs. the rules' 9-key KWRAOUPBT
+fortune = "plover"        # TP-RPB, 5 keys, vs. the rules' 10-key TPOFRPB/-PB
+success = "plover"        # SKES, 4 keys, vs. the rules' 8-key SUBG/SES
+drinks = "plover"         # TKREUS, 6 keys, vs. the rules' 10-key TKR*EUPBGS
+insurance = "plover"      # SHURPBS, 7 keys, vs. the rules' 12-key EUPB/SHURPBS
+elevator = "plover"       # HR-FR, 4 keys, vs. the rules' 10-key EL/SRAEURT
+challenge = "plover"      # KHA, 3 keys (Plover's own KHALG partially holds its own "nj" coda
+                           # cluster; dropped rather than completed, same class as `good`'s AOD)
+                           # vs. the rules' 8-key KHAL/-PBLG
+student = "plover"        # STAUPB, 6 keys, vs. the rules' 9-key STAOUPBTD
+incredibly = "plover"     # TPHRERBL, 8 keys, vs. the rules' 16-key EUPB/KRED/PWHREU
+strength = "plover"       # STRE, 4 keys, vs. the rules' 9-key STR*EPBGT
+argue = "plover"          # ARG, 3 keys, vs. the rules' 10-key AR/TKPWAOU
+greatest = "plover"       # TKPWRAEFT, 9 keys, vs. the rules' 12-key TKPWRAEUT/-FT
+reasons = "plover"        # R-PBS, 4 keys, vs. the rules' 8-key RAOEFPBZ
+concentrate = "plover"    # SKRAEUT, 7 keys, vs. the rules' 15-key KAPBS/-PB/TRAEUT
+breaking = "plover"       # PWRAEG, 6 keys, vs. the rules' 9-key PWRAEBG/-G
+noticed = "plover"        # TPH-TD, 5 keys, vs. the rules' 8-key TPHOEFTD
+deserves = "plover"       # TKEFRBS, 7 keys, vs. the rules' 14-key TKE/STKPWEFRBZ
+airport = "plover"        # AEURP, 5 keys, vs. the rules' 9-key AEUR/PORT
+onto = "plover"           # OEPBT, 5 keys, vs. the rules' 8-key OPB/TAOU
+research = "plover"       # REFRPB, 6 keys, vs. the rules' 9-key RE/SEFRPB
+mountain = "plover"       # PH*PB, 5 keys, vs. the rules' 8-key PHO*UPBT
+urgent = "plover"         # URGT, 4 keys, vs. the rules' 10-key URPBLG/-PBT
+agents = "plover"         # AEUGTS, 6 keys, vs. the rules' 12-key AEUPBLG/-PBTS
+inform = "plover"         # TPH-F, 4 keys, vs. the rules' 11-key EUPB/TPORPL
+program = "plover"        # PRAPL, 5 keys, vs. the rules' 8-key PROERPLG
+changing = "plover"       # KHAPBG/-G, 7 keys, vs. the rules' 11-key KHAEUPBLG/-G
+opened = "plover"         # OED, 3 keys, vs. the rules' 7-key OEP/-PBD
+mister = "plover"         # PHR, 3 keys, vs. the rules' 6-key STPHER
+opens = "plover"          # OES, 3 keys, vs. the rules' 7-key OEP/-PBZ
+opening = "plover"        # OEPG, 4 keys, vs. the rules' 7-key OEP/-PBG
+yourselves = "plover"     # KWRURSZ, 7 keys, vs. the rules' 11-key KWRUR/SEFLZ
+disease = "plover"        # TK-Z, 3 keys, vs. the rules' 7-key STKAOEZ
+anytime = "plover"        # TPHAOEUPL, 9 keys, vs. the rules' 15-key EPB/AOE/TAOEUPL
+
+# `district` and `describe` are the one real wrinkle this pass found: `matches_real_consonants`
+# only ever checks the word's *first* syllable's onset and *last* syllable's coda, so a cluster
+# belonging to a syllable in between is invisible to it. Both words reduce their real first sound
+# (the "d" of "district"/"describe") into nothing, which happens to share a key with the next
+# syllable's own, unrelated onset cluster ("tr", "skr") — the checker mistakes that shared key for
+# a fragment of the *first* syllable's sound and drops it, when it was never attempting that sound
+# at all. `best_brief`'s own `plover` source falls for this (`district` -> `R-T`, dropping a real
+# "t" out of "tr"; `describe` -> `SREUB`, dropping a real "k" out of "skr") so both are pinned to
+# their correct, whole-cluster literal outline instead, the same way any other hand-checked literal
+# in this file is. Worth fixing in `drop_fragments`/`matches_real_consonants` itself at some point —
+# this is a narrow blind spot, not a one-off, and could be silently wrong elsewhere too.
+district = "TR-T"         # 3 keys, vs. the rules' 9-key STKREUBGT
+describe = "SKREU"        # 5 keys, vs. the rules' 12-key TKE/SKRAOEUB
