@@ -1,16 +1,20 @@
 # Handoff plans
 
-Five outstanding asks from this session, written up for a fresh agent (or several, run in
-parallel or in sequence) to pick up with no other context. Each file is self-contained — read the
-one you're assigned, not the others, unless a plan explicitly points you at another.
+Originally five outstanding asks from one session, written up for a fresh agent (or several, run
+in parallel or in sequence) to pick up with no other context. Each file is self-contained — read
+the one you're assigned, not the others, unless a plan explicitly points you at another.
 
-| Plan | What | Touches |
-|---|---|---|
-| [01-suffix-expansion.md](01-suffix-expansion.md) | Grow `rules/suffixes.toml` — the user has asked twice for "WAY more suffixes" | `rules/suffixes.toml`, `rules/plover.toml` (prefixes), `docs/suffixes.md` |
-| [02-brief-expansion.md](02-brief-expansion.md) | Find more words outside the auto-brief window worth a deliberate brief, with an explicit keep/reject rule | `rules/briefs.toml`, `docs/theory.md` |
-| [03-docs-restructure.md](03-docs-restructure.md) | Reorder `docs/` into a sequential, start-to-finish read — currently a lookup table, not a tutorial | all of `docs/` |
-| [04-claude-md-docs-importance.md](04-claude-md-docs-importance.md) | Write `.claude/CLAUDE.md` — a standing reminder that docs outrank code in this repo | new file, `.claude/CLAUDE.md` |
-| [05-kpa-family-consistency.md](05-kpa-family-consistency.md) | Decide and (if approved) implement a consistent capitalize/lowercase stroke scheme | `rules/reserved/commands.json`, deployed config |
+**Status: 01-04 landed and are on `main`. 05 is still a decision for the user, not implemented. 06
+is a new scoping doc, not yet reviewed or built.**
+
+| Plan | What | Touches | Status |
+|---|---|---|---|
+| [01-suffix-expansion.md](01-suffix-expansion.md) | Grow `rules/suffixes.toml` — the user has asked twice for "WAY more suffixes" | `rules/suffixes.toml`, `rules/plover.toml` (prefixes), `docs/suffixes.md` | done |
+| [02-brief-expansion.md](02-brief-expansion.md) | Find more words outside the auto-brief window worth a deliberate brief, with an explicit keep/reject rule | `rules/briefs.toml`, `docs/theory.md` | done |
+| [03-docs-restructure.md](03-docs-restructure.md) | Reorder `docs/` into a sequential, start-to-finish read — currently a lookup table, not a tutorial | all of `docs/` | done |
+| [04-claude-md-docs-importance.md](04-claude-md-docs-importance.md) | Write `.claude/CLAUDE.md` — a standing reminder that docs outrank code in this repo | new file, `.claude/CLAUDE.md` | done |
+| [05-kpa-family-consistency.md](05-kpa-family-consistency.md) | Decide and (if approved) implement a consistent capitalize/lowercase stroke scheme | `rules/reserved/commands.json`, deployed config | **awaiting a decision** between the three candidate schemes written up for the user |
+| [06-phrase-briefs.md](06-phrase-briefs.md) | Scope (not build) a small, lyk-native phrase-brief system — one stroke for a pronoun+verb fragment | new subsystem, TBD files | **scoping doc only**, awaiting review before any build work |
 
 ## Order, if running them one at a time
 
