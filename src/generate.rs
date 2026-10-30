@@ -164,7 +164,13 @@ fn best_brief(
     // would otherwise have won anyway.
     candidates.sort_by_key(|(dropped, o)| {
         let collides = *dropped && natural.get(&render_outline(o)).is_some_and(|&owner| owner != word);
-        (o.len(), !rules.matches_real_consonants(o, word, sounds), collides, keys(o))
+        // Two of Plover's own gold outlines sometimes tie on every measure above (`best`'s own
+        // `PW*ES` and `PWEFT` both cost 5 keys) — a star used only as a tie-break coin flip in
+        // their own source, not for anything this word actually needs disambiguated. Preferring
+        // the star-free one when every other measure is equal costs nothing and never overrides
+        // a real win on length, fragment-safety, collision avoidance or key count above it.
+        let starred = o.iter().any(|s| s.0 & Stroke::STAR != 0);
+        (o.len(), !rules.matches_real_consonants(o, word, sounds), collides, keys(o), starred)
     });
     // The best candidate by that order is usually free, but not always: the commonest word to
     // ever want an outline keeps it (that's the whole point of settling words commonest-first),

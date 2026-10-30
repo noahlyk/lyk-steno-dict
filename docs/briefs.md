@@ -44,6 +44,15 @@ outline would have cost). This only ever reaches further down its *own* ranked l
 reconsiders a word already settled, so it costs nothing to a commoner word and changes nothing
 about which word wins a shared outline.
 
+Fewest keys can still leave a flat tie between two of a word's own gold outlines — Plover's own
+list for `best` has both `PW*ES` and `PWEFT`, costing exactly the same 5 keys. The star there
+isn't disambiguating anything this word needs told apart; it's just an artifact of Plover's own
+source, picked over the plain form by nothing more principled than list order. The star-free
+candidate wins a tie like this (`best` lands on `PWEFT`, matching the `[coda]` rule for `-st`
+rather than a coin flip) — a tie-break that only ever fires once every sharper measure above it
+(length, fragment-safety, collision-avoidance, keys) has already come out equal, so it can never
+turn a word away from a genuinely cheaper or safer candidate.
+
 The window itself (`count`) is a default for words nobody has looked at individually, not a
 ceiling: a word named explicitly in `[word]` gets a brief regardless of rank, the same way a
 two-key-or-fewer outline already does regardless of rank. That is only done when every one of
