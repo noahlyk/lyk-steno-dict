@@ -546,6 +546,61 @@ spelling = "dis"
 sounds = ["D IH0 S", "D IH1 S", "D IH2 S", "D IH0 Z"]
 keys = "STK"
 
+# The first [[prefix]] whose spelling and sounds both match wins (see `fn prefix` in
+# `src/rules.rs`) — so whenever one prefix's spelling is itself the start of another's (`un`
+# starts `under`), the longer one has to come first in this file, or every `under-` word would be
+# caught as `un-` plus a leftover "der" syllable instead. `inter`, `under`, `over`, `mis` are all
+# listed ahead of `un` for exactly that reason (none of them is a prefix of another, so their own
+# relative order doesn't matter).
+
+# `over-`, `under-`, `inter-` are two syllables each, ending in the `R`-coloured `ER` vowel — too
+# much to spell out and still save a stroke, so (like `ex-`/`dis-`) they get a short left-hand
+# chord that stands for the whole prefix, `ER` included, rather than literally transcribing it (the
+# `sounds` run has to reach through the `ER` too, or the rules just write it out again right after
+# the chord, doubling it). `over-`'s only true consonant is `V`, so it reuses `V`'s own onset chord,
+# `SR`. `under-` and `inter-` reuse the onset chords of their own two consonants (`N` + `D` is
+# `TPH` + `TK`; `N` + `T` is `TPH` + `T`, which `TPH` already contains) plus a left-hand `R` for
+# the `ER` they both end in, which also keeps `inter-`'s chord distinct from `un-`'s.
+[[prefix]]
+spelling = "inter"
+sounds = ["IH0 N T ER0", "IH1 N T ER0", "IH2 N T ER0"]
+keys = "TPHR"
+
+[[prefix]]
+spelling = "under"
+sounds = ["AH0 N D ER0", "AH1 N D ER0", "AH2 N D ER0"]
+keys = "TKPHR"
+
+[[prefix]]
+spelling = "over"
+sounds = ["OW0 V ER0", "OW1 V ER0", "OW2 V ER0"]
+keys = "SR"
+
+# `mis-` already has an onset and a coda like `dis-` does, so it is written the exact same way:
+# `M`'s own onset chord (`PH`) plus a left-hand `S` standing in for the coda, in steno order.
+[[prefix]]
+spelling = "mis"
+sounds = ["M IH0 S", "M IH1 S", "M IH2 S"]
+keys = "SPH"
+
+# `un-` is already just a syllable (a vowel and its `N` coda), and a short one at that, but it
+# often lands on a stroke of its own instead of folding onto the next one ("unable" U/TPHAEUBL) —
+# a fixed prefix lets it join every time, the same saving `ex-`/`dis-` get. Its own onset is
+# empty, so the keys are simply `N`'s own onset chord, `TPH`, with nothing of the vowel kept, the
+# same way a suffix drops its own vowel.
+[[prefix]]
+spelling = "un"
+sounds = ["AH0 N", "AH1 N", "AH2 N"]
+keys = "TPH"
+
+# `re-` and `pre-` are not here: they already have their own carve-out above ([[spelled]]'s
+# `IH.e`/`IY.e` entries), which deliberately keeps their reduced vowel instead of dropping it —
+# a fixed prefix would run first and silently undo that. `non-` is not here either: its own sound
+# is a vowel between two copies of the *same* consonant (`N AA N`), so there is no second onset
+# chord to combine with `N`'s own (`TPH`) the way `under-`/`inter-` combine two different ones —
+# any stroke for it either collides with `un-`'s `TPH` or has to be picked arbitrarily, and the
+# word is already a single compact stroke without one (`nonsense` TPHOPB/SEPBS).
+
 [reduce]
 vowels = ["AH", "IH", "ER", "IY.ly", "OW.ed"]
 # Whether the consonants joining the stroke before may land out of steno order (`any`: `lately`

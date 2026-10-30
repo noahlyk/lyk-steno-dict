@@ -47,11 +47,17 @@ fixed, not just found:
 
 ## 2. Dictionary growth
 
-- **Suffixes** (`rules/suffixes.toml`): `-tive`, `-ic`/`-ical`, `-al`/`-ial`/`-ual`, `-ty`/`-ity`,
-  `-logy`/`-graphy`/`-ography`, `-ious`/`-eous` (folded into existing `-ous`), `-cy`/`-sy`, `-ify`
-  (two-stroke, like `-ism`). Plus prefix strokes on the same "fixed stroke that glues onto the next
-  one" pattern `ex-`/`dis-` already use: `un-`, `re-`, `pre-`, `non-`, `over-`, `under-`, `mis-`,
-  `inter-`.
+- **Suffixes** (`rules/suffixes.toml`) — done: `-tive`, `-ic`/`-ical`, `-al`, `-logy`, `-ity`/`-ety`,
+  `-cy`/`-sy`, `-ify` (two-stroke, like `-ism`). `-ious`/`-eous` needed no new entry — it's already
+  the existing "-y" stroke followed by the existing "-ous" stroke. `-graphy`/`-ography` stayed out:
+  the schwa right before it takes a spelling-dependent vowel no fixed standalone stroke can know in
+  advance (see `docs/suffixes.md`'s own "Not yet covered" for why). Plus prefix strokes on the same
+  "fixed stroke that glues onto the next one" pattern `ex-`/`dis-` already use: `un-`, `mis-`,
+  `over-`, `under-`, `inter-` (`rules/plover.toml`). `re-` and `pre-` stayed out too — they already
+  have their own carve-out ([[spelled]]'s `IH.e`/`IY.e` entries) that deliberately keeps their
+  reduced vowel, which a fixed prefix would silently override. `non-` stayed out: its sound is a
+  vowel between two copies of the same consonant (`N AA N`), so there is no second onset chord to
+  combine with `un-`'s own the way `under-`/`inter-` combine two different ones.
 - **Briefs** (`rules/briefs.toml`): raise `count` past 1500 and hand-check the next tier; the
   `work`/`wore`/`working`/`worrying`/`wok` collision mess from the Discord log is a concrete sign
   these need explicit briefs instead of improvised rule codas.

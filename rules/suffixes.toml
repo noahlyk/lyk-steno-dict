@@ -43,6 +43,19 @@
 # `rules/plover.toml` already has for Plover's own F-insertion convention (`lesson` HR-FPB).
 "^-FPL" = "some"
 
+# "-ic" ("bas-ic", "com-ic", "mus-ic", "tox-ic"): no onset of its own (CMUdict always gives the
+# word's own stem the consonant before it), IH + K reduced to bare K, "-BG", unclaimed. Confirmed
+# against the real generator's own continuation stroke for these words when "-ic" doesn't fit on
+# the stem's stroke: `music` PHAOUZ/^-BG, `logic` HROPBLG/^-BG, `panic` PAPB/^-BG.
+"^-BG" = "ic"
+
+# "-tive" ("ac-tive", "posi-tive"): T onset plus the same IH + V reduced to bare -F "-ive" above
+# already uses, together "T-F". Confirmed against `positive` POZ/^T-F, whose "-tive" continuation
+# is exactly this when the T doesn't also fit on the stem's own stroke (it sometimes does, as in
+# `active` ABGT/^-F, but a standalone suffix can't assume a stem will have room for it, so it
+# keeps its own T rather than gambling on a fold that depends on the word).
+"^T-F" = "tive"
+
 # Suffixes with a real vowel: the first batch above all happened to reduce to a bare consonant
 # skeleton with nothing else claiming it. These are the rest of the common ones, worked out by
 # the one rule above and checked against every stroke already in this file.
@@ -60,6 +73,11 @@
 "^AOE" = "y"      # bare IY kept: only the `-ly` spelling of IY is in `[reduce]`, not plain IY
 "^-PBLG" = "age"  # IH + JH reduced: bare -PBLG, the same `[coda]` cluster "village"'s own "-age"
                    # already ends in, unclaimed on its own
+"^UL" = "al"      # AH + L kept: reduced, bare L is "^-L"'s own stroke ("ly"). No onset of its own
+                   # either (CMUdict always gives the preceding consonant to the stem, e.g.
+                   # "nation-al" once "-tion" has already eaten the N: "national" TPHAGS/^-L in the
+                   # generator's own reduced form, which is why the standalone suffix can't reuse
+                   # that same bare -L and has to keep its vowel instead)
 
 # Two syllables, so two continuation strokes, each one the one rule above applied on its own.
 "^EUZ/^-PL" = "ism"  # IH + Z kept (reduced, "Z" alone is "^-Z"'s own stroke, "s"), then AH + M
@@ -67,3 +85,39 @@
 "^-R/^AOE" = "ary"    # "-ary"/"-ery"/"-ory" (same unstressed sound) is, phonetically, exactly
                        # the already-claimed "-er" stroke followed by the already-claimed "-y"
                        # stroke above — two syllables this table had already worked out alone
+
+# "-ical" ("electr-ical", "mus-ical"): exactly "-ic" above, then "-al" above, struck one after the
+# other — the same two already-claimed pieces, not a new key combination.
+"^-BG/^UL" = "ical"
+
+# "-logy" ("bi-ology", "ge-ology", "psych-ology"): a genuinely stressed syllable, not run through
+# `[reduce]` at all — AA is never a `[reduce]` vowel, so it keeps its vowel the way any stressed
+# syllable does, the coda L kept with it ("ol", `[vowel]` + `[coda]`, unclaimed combination), then
+# "-gy" (JH + the `[[spelled]]` "ends in y" IY.y, also never reduced: "^AOE"'s "-y" stroke uses the
+# plain IY label instead, so this isn't a collision). Confirmed against the real generator's own
+# strokes for these words: `biology` PWAOEU/^OL/^SKWREU, `technology` TEBG/TPHOL/^SKWREU — "OL" and
+# "SKWREU" show up as the invariant tail regardless of what the stem supplies before them.
+"^OL/^SKWREU" = "logy"
+
+# "-ity"/"-ety" ("clar-ity", "activ-ity", "anxi-ety", "soci-ety"): two syllables, neither with an
+# onset of its own (the stem supplies whatever consonant comes before, same story as "-al" above).
+# First is a bare AH with no consonants at all to drop — nothing to reduce to, so it keeps its
+# vowel out of necessity, not collision (a syllable with zero onset and coda always does: see
+# `rules/plover.toml`'s own `continuation` comment). Second is T + the `[[spelled]]` "y"-ending IY,
+# "^AOE"'s own vowel, kept the same way. Confirmed directly: `clarity` KHRAEUR/^U/^TEU (as a
+# three-stroke reading), `society` SO/SAOEU/^U/^TEU — "U" then "TEU" is the invariant tail. Plain
+# "-ty" with no leading schwa ("safe-ty") is just the second stroke alone, already covered without
+# a separate entry.
+"^U/^TEU" = "ity"
+
+# "-cy"/-"sy" ("priva-cy", "fanta-sy", "poli-cy", "democra-cy"): the exact same bare-AH first
+# syllable as "-ity" above (so the same first stroke — two different suffixes may start the same
+# way, only the full outline has to stay distinct), then S + the "y"-ending IY kept. Confirmed:
+# `legacy` HREG/^U/^SEU, `democracy` TKE/PHARBG/^U/^SEU — "U" then "SEU" is the invariant tail.
+"^U/^SEU" = "cy"
+
+# "-ify"/"-fy" ("clar-ify", "simpl-ify", "ident-ify"): same bare-AH first syllable again, then F +
+# AY kept (AY is never in `[reduce]`, same as "-ize"). Confirmed: `clarify` KHRAEUR/^U/^TPAOEU,
+# `identify` AOEU/TKEPBT/^U/^TPAOEU — "U" then "TPAOEU" is the invariant tail, the same two-stroke
+# shape as "-ism" above.
+"^U/^TPAOEU" = "ify"
