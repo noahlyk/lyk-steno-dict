@@ -249,8 +249,25 @@ fn main() -> Result<()> {
     }
 }
 
-/// `build` and `plugin`, straight into keymux's live config: the words file and the fallback
-/// plugin it would otherwise take two commands and two manual copies to update.
+/// Every file lyk's keymux config is made of, besides the two this binary generates fresh each
+/// time (the words dictionary and the fallback plugin): the reserved stroke tables this repo
+/// already tracks as its own source of truth (`rules/reserved/`), verbatim, under the numbered
+/// name keymux loads them by, plus the two pieces of generic keymux scaffolding (the regenerate
+/// script and the theory-name marker) every theory folder needs to be recognized and reloadable
+/// at all. Static, not derived from the rules, so `deploy` can rebuild the whole folder from
+/// nothing rather than silently dropping anything it doesn't happen to find already there.
+const STATIC_FILES: &[(&str, &str)] = &[
+    ("01-lyk-commands.json", include_str!("../rules/reserved/commands.json")),
+    ("03-lyk-punctuation.json", include_str!("../rules/reserved/punctuation.json")),
+    ("04-lyk-emilys-modifiers.json", include_str!("../rules/reserved/emilys-modifiers.json")),
+    ("04-lyk-emilys-modifiers.py", include_str!("../rules/reserved/emilys-modifiers.py")),
+    ("regenerate.py", include_str!("../rules/reserved/regenerate.py")),
+    (".keymux-theory", "lyk\n"),
+];
+
+/// `build` and `plugin`, plus every reserved stroke table and the generic scaffolding keymux
+/// needs, straight into keymux's live config: the whole folder from one command, not a partial
+/// update that assumes the rest is already sitting there correctly.
 fn deploy(
     setup: &analysis::Setup,
     briefs: &generate::Briefs,
@@ -270,12 +287,24 @@ fn deploy(
     let plugin_to = to.join("05-lyk-orthographic-fallback.rs");
     std::fs::copy(&words_out, &words_to).with_context(|| words_to.display().to_string())?;
     std::fs::copy(&plugin_out, &plugin_to).with_context(|| plugin_to.display().to_string())?;
-
     for (from, dest) in [(&words_out, &words_to), (&plugin_out, &plugin_to)] {
         let (a, b) = (std::fs::read(from)?, std::fs::read(dest)?);
         anyhow::ensure!(a == b, "{} and {} differ after copying", from.display(), dest.display());
     }
-    println!("deployed to {}", to.display());
+
+    for (name, content) in STATIC_FILES {
+        let dest = to.join(name);
+        std::fs::write(&dest, content).with_context(|| dest.display().to_string())?;
+        let written = std::fs::read_to_string(&dest).with_context(|| dest.display().to_string())?;
+        anyhow::ensure!(written == *content, "{} differs after writing", dest.display());
+    }
+
+    println!(
+        "deployed to {} ({} generated, {} static)",
+        to.display(),
+        2,
+        STATIC_FILES.len()
+    );
     Ok(())
 }
 
