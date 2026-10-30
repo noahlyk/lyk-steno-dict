@@ -73,5 +73,13 @@ re-derived by eye anymore, which is what let the old hand-maintained copy drift 
 schwa ("uh") for a bare consonant that resolve itself never did. Regenerate and redeploy this
 file after any change to the rule tables, rather than hand-editing the deployed plugin directly.
 
+The generated plugin also exports `joins(bits) -> bool`, answering true whenever `Stroke::JOIN`
+is set. keymux itself has no built-in idea of a "join key" — every stroke key, standard or a
+theory's own extra one, is just a bit to the engine — so without this export the real-time
+translator would never recognize `+` as a continuation and would treat every stroke as its own
+word, even though direct dictionary lookups of an already-built multi-stroke entry (like
+`WORBG/+-G`) would still work. This is why `cargo run -- plugin` must be regenerated and
+redeployed any time `Stroke::JOIN`'s bit position changes, not just when a rule table does.
+
 This is the last chapter of the theory itself. Next: **[where lyk stands](../README.md#where-lyk-stands)** —
 the benchmarks, a measured result of everything above rather than a rule of its own.

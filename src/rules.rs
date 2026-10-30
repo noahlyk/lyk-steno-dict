@@ -1519,6 +1519,11 @@ pub extern "C" fn fallback(ptr: i32, len: i32) -> i64 {{
     std::mem::forget(out);
     (i64::from(out_ptr as i32) << 32) | i64::from(out_len as i32)
 }}
+
+#[no_mangle]
+pub extern "C" fn joins(bits: i64) -> i32 {{
+    i32::from(bits as u32 & JOIN != 0)
+}}
 "##,
             left = Stroke::LEFT,
             vowels = Stroke::VOWELS,
