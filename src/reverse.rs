@@ -67,7 +67,7 @@ mod tests {
 
     #[test]
     fn an_all_caps_outline_classifies_as_a_stroke() {
-        assert_eq!(classify("KAT/^-D"), Query::Stroke(parse_outline("KAT/^-D").unwrap()));
+        assert_eq!(classify("KAT/+-D"), Query::Stroke(parse_outline("KAT/+-D").unwrap()));
     }
 
     #[test]

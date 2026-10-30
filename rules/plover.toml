@@ -615,7 +615,7 @@ loose = ["R", "L"]
 
 [theory]
 # lyk is steno with explicit word boundaries: every stroke after the first of a word carries the
-# join key (`^`). A stroke without it always starts a word, so continuation strokes can be short
+# join key (`+`). A stroke without it always starts a word, so continuation strokes can be short
 # and overlap with words without ever being taken for one.
 join_key = true
 

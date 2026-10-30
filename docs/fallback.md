@@ -21,8 +21,8 @@ of the keys — is only a stroke with nothing left once the star and join keys a
 onset, no vowel, no coda, because the star and join alone carry no sound.
 
 **Vowel key spelling matters.** `AO` alone is lyk's vowel key for the "uh" sound; `AOU` (with a
-`U`) is the one that means "oo". `-T/^AO` reads back as "tuh", not "too" — that's not a miss or a
-bug, that's what the vowel key means. If you want "too", the stroke is `-T/^AOU`.
+`U`) is the one that means "oo". `-T/+AO` reads back as "tuh", not "too" — that's not a miss or a
+bug, that's what the vowel key means. If you want "too", the stroke is `-T/+AOU`.
 
 Two different sounds can use the exact same keys (`Z` and its silent-glide cluster `Z Y` are both
 `STKPW`; a plain vowel and a spelling variant can be the same keys too), which the rules can't
@@ -34,8 +34,8 @@ matching what you meant.
 
 ```
 cargo run --release -- resolve STKPW        # a stroke not in the dictionary, read back
-cargo run --release -- resolve -- "-T/^AO"  # "too" — see below for why, not "AOU"'s own "too"
-cargo run --release -- resolve -- "-T/^AOU" # "too"
+cargo run --release -- resolve -- "-T/+AO"  # "too" — see below for why, not "AOU"'s own "too"
+cargo run --release -- resolve -- "-T/+AOU" # "too"
 ```
 
 Bare `AO` is a three-way collision, not a clean pair: it's the stroke for the plain vowel of

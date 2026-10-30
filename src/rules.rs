@@ -1413,9 +1413,9 @@ fn resolve_stroke(bits_with_join: u32) -> Option<(Vec<String>, Option<String>, V
     Some((onset, vowel, coda, marker, join))
 }}
 
-/// Parse one stroke's notation (`KAT`, `-T`, `^AO`) into its bits.
+/// Parse one stroke's notation (`KAT`, `-T`, `+AO`) into its bits.
 fn parse_stroke(text: &str) -> Option<u32> {{
-    let (mut bits, text) = match text.strip_prefix('^') {{
+    let (mut bits, text) = match text.strip_prefix('+') {{
         Some(rest) => (JOIN, rest),
         None => (0, text),
     }};
@@ -1642,7 +1642,7 @@ mod tests {
         // Two labels can share the exact same keys (a plain sound and a spelling variant, or a
         // sound and its silent-glide cluster); the read-back always picks the same one
         for _ in 0..5 {
-            assert_eq!(read("A/^A"), Some("aa".to_owned()));
+            assert_eq!(read("A/+A"), Some("aa".to_owned()));
         }
     }
 

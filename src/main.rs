@@ -114,7 +114,7 @@ enum Command {
     /// dictionary: the word if it's one the dictionary writes, otherwise the rules' best
     /// phonetic reading of the keys, or a true miss if no reading fits them at all
     Resolve {
-        /// A stroke outline, such as `KAT` or `TPAEU/^HR`
+        /// A stroke outline, such as `KAT` or `TPAEU/+HR`
         outline: String,
         /// Words to cover when building the dictionary, most common first
         #[arg(long, default_value_t = 30_000)]

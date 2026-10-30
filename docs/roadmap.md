@@ -63,7 +63,7 @@ fixed, not just found:
   these need explicit briefs instead of improvised rule codas.
 - **Compound suffix strokes** (lower priority): one continuation stroke for a common suffix *pair*
   (e.g. `-er`+`-s` → "-ers" in one stroke instead of two) — the one portable idea from tarot's
-  Discord chart. Our `^` key already makes single suffixes cheap; this is a smaller win than
+  Discord chart. Our `+` key already makes single suffixes cheap; this is a smaller win than
   filling out single-suffix coverage first, so it comes after Plan 2's main suffix work, not before.
 
 ## 3. Theory architecture — ideas from reading onyx's write-ups

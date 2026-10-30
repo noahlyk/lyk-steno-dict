@@ -73,7 +73,7 @@ impl Gold {
     }
 }
 
-/// An outline with the markers of a continuation stroke taken off: `^`, a leading `KWR` before a
+/// An outline with the markers of a continuation stroke taken off: `+`, a leading `KWR` before a
 /// vowel, and a star.
 fn shape(outline: &str) -> String {
     outline
@@ -83,7 +83,7 @@ fn shape(outline: &str) -> String {
             if n == 0 {
                 return stroke.to_owned();
             }
-            let stroke = stroke.strip_prefix('^').unwrap_or(stroke);
+            let stroke = stroke.strip_prefix('+').unwrap_or(stroke);
             let stroke = match stroke.strip_prefix("KWR") {
                 Some(rest) if rest.starts_with(['A', 'O', 'E', 'U', '*']) => rest,
                 _ => stroke,

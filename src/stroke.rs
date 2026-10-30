@@ -23,12 +23,12 @@ impl Stroke {
     pub const VOWELS: u32 = mask(8, 9) | mask(11, 12);
     pub const STAR: u32 = 1 << 10;
     pub const RIGHT: u32 = mask(RIGHT, 22);
-    /// The join key: the stroke continues the word before it. Written `^` before the keys.
+    /// The join key: the stroke continues the word before it. Written `+` before the keys.
     pub const JOIN: u32 = 1 << 23;
 
     /// Parse notation such as `KAT`, `-T` or `STPH*`. Numbers and a bare `#` are not supported.
     pub fn parse(text: &str) -> Option<Self> {
-        let (mut bits, text) = match text.strip_prefix('^') {
+        let (mut bits, text) = match text.strip_prefix('+') {
             Some(rest) => (Self::JOIN, rest),
             None => (0, text),
         };
@@ -73,7 +73,7 @@ impl fmt::Display for Stroke {
         let has_vowel = self.0 & (mask(VOWEL, 12)) != 0;
         let mut hyphen = !has_vowel;
         if self.0 & Self::JOIN != 0 {
-            write!(f, "^")?;
+            write!(f, "+")?;
         }
         for (index, &key) in KEYS.iter().enumerate() {
             if self.0 & (1 << index) == 0 {
@@ -117,8 +117,8 @@ mod tests {
             "*S",
             "SKWR-PBLG",
             "U",
-            "^-G",
-            "^AOE",
+            "+-G",
+            "+AOE",
         ] {
             assert_eq!(Stroke::parse(text).unwrap().to_string(), text, "{text}");
         }

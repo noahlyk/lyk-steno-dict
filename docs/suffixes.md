@@ -26,67 +26,67 @@ continuations, each one still just a syllable through the same rule.
 
 | Stroke | Suffix | Example |
 |---|---|---|
-| `^-G` | -ing | *walk-ing* |
-| `^-D` | -ed | *walk-ed* |
-| `^-S` | -s | *cat-s* (unvoiced) |
-| `^-Z` | -s | *dog-s* (voiced; same written suffix as `^-S`, a second stroke for whichever sound the word actually ends in) |
-| `^-L` | -ly | *slow-ly* |
-| `^-R` | -er | *fast-er* |
-| `^-PB` | -en | *wood-en* |
-| `^-FT` | -est | *fast-est* |
-| `^-PBS` | -ness | *dark-ness* |
-| `^-PLT` | -ment | *pay-ment* |
-| `^-GS` | -tion | *na-tion* |
-| `^-BL` | -able | *read-able* |
-| `^-FL` | -ful | *care-ful* (F, L) |
-| `^-LS` | -less | *care-less* (L, S) |
-| `^-PBT` | -ent | *differ-ent* (N, T — distinct from `-ment`'s `^-PLT`) |
-| `^-LT` | -let | *book-let*, *pig-let* (L, T) |
-| `^*T` | -th | *wid-th*, *warm-th*, *four-th* (the `*T` coda) |
-| `^-FPL` | -some | *awe-some*, *lone-some* (the same S-M → `-FPL` cluster Plover's own F-insertion convention uses, e.g. `lesson` HR-FPB) |
-| `^-BG` | -ic | *bas-ic*, *com-ic*, *mus-ic*, *tox-ic* (no onset of its own — the stem always keeps the consonant before it) |
-| `^T-F` | -tive | *ac-tive*, *posi-tive* (T onset plus the same reduced IH + V `-ive` below already uses) |
+| `+-G` | -ing | *walk-ing* |
+| `+-D` | -ed | *walk-ed* |
+| `+-S` | -s | *cat-s* (unvoiced) |
+| `+-Z` | -s | *dog-s* (voiced; same written suffix as `+-S`, a second stroke for whichever sound the word actually ends in) |
+| `+-L` | -ly | *slow-ly* |
+| `+-R` | -er | *fast-er* |
+| `+-PB` | -en | *wood-en* |
+| `+-FT` | -est | *fast-est* |
+| `+-PBS` | -ness | *dark-ness* |
+| `+-PLT` | -ment | *pay-ment* |
+| `+-GS` | -tion | *na-tion* |
+| `+-BL` | -able | *read-able* |
+| `+-FL` | -ful | *care-ful* (F, L) |
+| `+-LS` | -less | *care-less* (L, S) |
+| `+-PBT` | -ent | *differ-ent* (N, T — distinct from `-ment`'s `+-PLT`) |
+| `+-LT` | -let | *book-let*, *pig-let* (L, T) |
+| `+*T` | -th | *wid-th*, *warm-th*, *four-th* (the `*T` coda) |
+| `+-FPL` | -some | *awe-some*, *lone-some* (the same S-M → `-FPL` cluster Plover's own F-insertion convention uses, e.g. `lesson` HR-FPB) |
+| `+-BG` | -ic | *bas-ic*, *com-ic*, *mus-ic*, *tox-ic* (no onset of its own — the stem always keeps the consonant before it) |
+| `+T-F` | -tive | *ac-tive*, *posi-tive* (T onset plus the same reduced IH + V `-ive` below already uses) |
 
 ## Suffixes that kept their vowel (dropping it would collide with a stroke above)
 
 | Stroke | Suffix | Why the vowel stayed |
 |---|---|---|
-| `^US` | -ous | reduced to bare `S`, already `^-S`'s own stroke ("s") |
-| `^EUFT` | -ist | reduced to bare `S T`, already `^-FT`'s own stroke ("est") |
-| `^UPBS` | -ance/-ence | reduced to bare `N S`, already `^-PBS`'s own stroke ("ness") — the identical unstressed sound covers both spellings |
-| `^UL` | -al | reduced to bare `L`, already `^-L`'s own stroke ("ly"); no onset of its own either (*national*'s own "-al", once "-tion" has eaten the N, is exactly this bare AH + L) |
+| `+US` | -ous | reduced to bare `S`, already `+-S`'s own stroke ("s") |
+| `+EUFT` | -ist | reduced to bare `S T`, already `+-FT`'s own stroke ("est") |
+| `+UPBS` | -ance/-ence | reduced to bare `N S`, already `+-PBS`'s own stroke ("ness") — the identical unstressed sound covers both spellings |
+| `+UL` | -al | reduced to bare `L`, already `+-L`'s own stroke ("ly"); no onset of its own either (*national*'s own "-al", once "-tion" has eaten the N, is exactly this bare AH + L) |
 
 ## Suffixes with a real vowel that was never reducible
 
 | Stroke | Suffix | Note |
 |---|---|---|
-| `^-F` | -ive | IH + V reduced to bare `-F`, unclaimed |
-| `^AOEUZ` | -ize | AY is outside `[reduce]`, nothing to drop |
-| `^SH-P` | -ship | SH + IH + P reduced to bare `SH-P`, unclaimed |
-| `^HAOD` | -hood | UH is outside `[reduce]`, nothing to drop |
-| `^WORD` | -ward | AO is outside `[reduce]`; happens to spell "WORD" — unintentional, but memorable |
-| `^AOE` | -y | bare IY kept — only the `-ly` spelling of IY is in `[reduce]`, not plain IY |
-| `^-PBLG` | -age | IH + JH reduced to bare `-PBLG`, the same cluster *village*'s own "-age" ending already uses |
+| `+-F` | -ive | IH + V reduced to bare `-F`, unclaimed |
+| `+AOEUZ` | -ize | AY is outside `[reduce]`, nothing to drop |
+| `+SH-P` | -ship | SH + IH + P reduced to bare `SH-P`, unclaimed |
+| `+HAOD` | -hood | UH is outside `[reduce]`, nothing to drop |
+| `+WORD` | -ward | AO is outside `[reduce]`; happens to spell "WORD" — unintentional, but memorable |
+| `+AOE` | -y | bare IY kept — only the `-ly` spelling of IY is in `[reduce]`, not plain IY |
+| `+-PBLG` | -age | IH + JH reduced to bare `-PBLG`, the same cluster *village*'s own "-age" ending already uses |
 
 ## Two-syllable suffixes (two continuation strokes)
 
 | Stroke | Suffix | Note |
 |---|---|---|
-| `^EUZ/^-PL` | -ism | IH + Z reduced (bare `Z`, already `^-Z`'s stroke), then AH + M reduced (bare `-PL`, unclaimed) |
-| `^-R/^AOE` | -ary/-ery/-ory | phonetically exactly the already-claimed `-er` stroke followed by the already-claimed `-y` stroke, two syllables this table had already worked out alone |
-| `^-BG/^UL` | -ical | exactly `-ic` then `-al` above, struck one after the other — the same two already-claimed pieces |
-| `^OL/^SKWREU` | -logy | *bi-ology*, *ge-ology*, *psych-ology* — a genuinely stressed syllable (AA is never in `[reduce]`, so it keeps its vowel the way any stressed syllable does, coda L kept with it), then "-gy" (JH + the plain, never-reduced IY `^AOE` already uses for "-y") |
-| `^U/^TEU` | -ity/-ety | *clar-ity*, *activ-ity*, *anxi-ety*, *soci-ety* — a bare AH with no consonants to drop (keeps its vowel out of necessity, not collision), then T + the "-y" vowel kept. Plain "-ty" with no leading schwa (*safe-ty*) is just the second stroke alone |
-| `^U/^SEU` | -cy/-sy | *priva-cy*, *fanta-sy*, *poli-cy*, *democra-cy* — the same bare-AH first stroke as "-ity" (two different suffixes may share an opening stroke; only the whole outline has to stay distinct), then S + the "-y" vowel kept |
-| `^U/^TPAOEU` | -ify/-fy | *clar-ify*, *simpl-ify*, *ident-ify* — the same bare-AH first stroke again, then F + AY kept (AY never reduces, same as "-ize") |
+| `+EUZ/+-PL` | -ism | IH + Z reduced (bare `Z`, already `+-Z`'s stroke), then AH + M reduced (bare `-PL`, unclaimed) |
+| `+-R/+AOE` | -ary/-ery/-ory | phonetically exactly the already-claimed `-er` stroke followed by the already-claimed `-y` stroke, two syllables this table had already worked out alone |
+| `+-BG/+UL` | -ical | exactly `-ic` then `-al` above, struck one after the other — the same two already-claimed pieces |
+| `+OL/+SKWREU` | -logy | *bi-ology*, *ge-ology*, *psych-ology* — a genuinely stressed syllable (AA is never in `[reduce]`, so it keeps its vowel the way any stressed syllable does, coda L kept with it), then "-gy" (JH + the plain, never-reduced IY `+AOE` already uses for "-y") |
+| `+U/+TEU` | -ity/-ety | *clar-ity*, *activ-ity*, *anxi-ety*, *soci-ety* — a bare AH with no consonants to drop (keeps its vowel out of necessity, not collision), then T + the "-y" vowel kept. Plain "-ty" with no leading schwa (*safe-ty*) is just the second stroke alone |
+| `+U/+SEU` | -cy/-sy | *priva-cy*, *fanta-sy*, *poli-cy*, *democra-cy* — the same bare-AH first stroke as "-ity" (two different suffixes may share an opening stroke; only the whole outline has to stay distinct), then S + the "-y" vowel kept |
+| `+U/+TPAOEU` | -ify/-fy | *clar-ify*, *simpl-ify*, *ident-ify* — the same bare-AH first stroke again, then F + AY kept (AY never reduces, same as "-ize") |
 
 ## Not yet covered
 
 - **`-ious`/`-eous`** (*curious*, *serious*, *various*, *obvious*, *previous*, *hideous*) already
   write with strokes this table has: the extra vowel before "-ous" is the same bare, never-reduced
-  IY the "-y" row above uses, so the whole ending is just `^AOE/^US` struck in sequence — no new
+  IY the "-y" row above uses, so the whole ending is just `+AOE/+US` struck in sequence — no new
   entry needed. Where there's no extra vowel (*gorgeous*, *courageous*, *religious*), it's plain
-  "-ous", `^US`, on its own.
+  "-ous", `+US`, on its own.
 - **`-graphy`/`-ography`** (*biography*, *photography*, *geography*, *calligraphy*,
   *choreography*) is not here: the schwa right before "-graphy" (the "ra" of "biogra-phy") takes a
   vowel key that depends on incidental spelling elsewhere in the word (`AH` vs the spelled `AH.o`

@@ -1,7 +1,7 @@
 # lyk-steno-theory
 
 **lyk is steno with explicit word boundaries.** Every stroke after the first of a word carries a
-join key (`^`), so a stroke without it always starts a word. Continuation strokes live apart from
+join key (`+`), so a stroke without it always starts a word. Continuation strokes live apart from
 the words, which lets a suffix be as short as `-G` or `-D` without ever being read as a word, and
 lets a stem overlap with a word without a clash.
 
@@ -46,7 +46,7 @@ looked up — **start there for the full table of contents and reading order.** 
 
 - **[The join key](docs/join-key.md)** — why word boundaries are explicit. Read this first.
 - **[Briefs](docs/briefs.md)** — the rule book for the commonest words' outlines.
-- **[The full suffix table](docs/suffixes.md)** — every standalone suffix (`^-G` "ing", `^-D`
+- **[The full suffix table](docs/suffixes.md)** — every standalone suffix (`+-G` "ing", `+-D`
   "ed", ...), the one rule they're derived from, and what isn't covered yet.
 - **[Punctuation & commands](docs/punctuation.md)** and
   **[fingerspelling & misc keys](docs/fingerspelling.md)** — the reserved strokes pinned ahead of
@@ -163,7 +163,7 @@ how much of everything typed is each syllable count, and how many keys a stroke 
 one.
 
 Longer words differ mostly where Plover and Lapwing have a brief, and where Lyk writes a bare
-`^-R` for an `-er` they write `*ER`. `mismatches --syllables N --after 1500` lists what is left.
+`+-R` for an `-er` they write `*ER`. `mismatches --syllables N --after 1500` lists what is left.
 
 `build` on the words all three dictionaries write, strokes and keys per word:
 

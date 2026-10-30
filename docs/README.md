@@ -6,7 +6,7 @@ This isn't a lookup table — it's a sequential read. Each chapter builds on the
 each one ends with a link to the next. Start at the top and read straight through if you want to
 learn the whole theory; come back here to jump to a specific chapter once you know your way around.
 
-1. **[The join key](join-key.md)** — why word boundaries are explicit, and what the `^` key buys
+1. **[The join key](join-key.md)** — why word boundaries are explicit, and what the `+` key buys
    every chapter after this one.
 2. **[Reserved strokes](reserved-strokes.md)** — commands, punctuation, and fingerspelling are
    pinned before any word is, ahead of even briefs. (The actual content of those strokes is
@@ -26,7 +26,7 @@ learn the whole theory; come back here to jump to a specific chapter once you kn
 9. **[How short](brevity.md)** — the brevity steps that shrink a long word's outline, by hand or
    by rule.
 10. **[The full suffix table](suffixes.md)** — every standalone continuation stroke a suffix gets
-    on its own (`^-G` "ing", `^-D` "ed", and the rest), the one rule they're all derived from, and
+    on its own (`+-G` "ing", `+-D` "ed", and the rest), the one rule they're all derived from, and
     which ones aren't covered yet.
 11. **[Punctuation & commands](punctuation.md)** — the actual content of the punctuation and
     command strokes reserved back in chapter 2.
