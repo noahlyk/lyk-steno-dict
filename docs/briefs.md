@@ -1,0 +1,52 @@
+# Briefs
+
+[← back to the table of contents](README.md) · [← back to the main README](../README.md)
+
+**Briefs** (`rules/briefs.toml`). The commonest words keep the outlines people already
+know, from Plover by default (`HE`, not `HAOE`) or Lapwing, per word. They are pinned before
+anything else is generated, and nothing generated can take their strokes. A briefed word gets
+exactly that one entry: no rule outline, no short form, no alternate pronunciation reachable
+alongside it. There is only ever one way to stroke the word, faster to learn than picking the
+cheapest of several, and whatever its rule outline or short forms would have claimed is never
+reserved, so a later, less common word is free to take it instead — a brief can shorten a
+completely unrelated word as a side effect, since words are settled once, commonest first,
+with nothing undone to recheck afterwards. A brief is free to be a pure memorized shortcut with
+no phonetic connection to its word at all — that's the point of a brief, and nothing about it
+needs to be "learnable from the rules" the way a generated outline is. What a candidate may
+never do is take only *part* of a key combination these same rules only ever use *together* for
+one sound. Plover's own shortest outline is sometimes exactly that: a fragment of its own
+theory's multi-key sound, not a clean shortcut (`good`'s Plover brief `KPWAOD` keeps the `P W`
+of `TKPW`'s own "g" but drops the `T`, which these rules read back as "k", not "g" — a
+different, wrong sound, not just an unrelated memorized one). That fragment is rejected, and
+two repairs are generated alongside the original candidates to replace it: completing the
+fragment into the whole, correct cluster, or dropping it outright, since a brief is always
+free to skip a sound it isn't attempting at all. Dropping is usually fewer keys, so it's what
+wins when it's available (`good`'s brief is `AOD` — no attempt at its "g" sound at all, rather
+than the seven-key `TKPWAOD` completing it) — but either repair only exists because the word's
+own gold dictionary pointed at that sound to begin with; nothing is invented from nothing.
+Fewest keys then picks among whichever candidates, original or repaired, are left — except that
+a *dropped* candidate (never a raw one) loses this tie-break if it lands exactly on the plain
+outline of a different, commonly-known word that would otherwise have needed it (`fact` used to
+drop its `K` entirely down to `TPAT`, exactly `fat`'s own plain outline, bumping `fat` onto the
+starred `TPA*T` to make room). A rarer word losing its plain outline to a brief outright is this
+whole mechanism's normal, accepted cost — that's what the star ladder is for — so this check
+only looks at words inside the brief window itself (`briefs.count`) that are not themselves
+landing a brief: a word briefed regardless of what it drops, like `a` pinned to `AEU`, was never
+going to need its own plain reading (`A`) at all, so it does not count as a collision.
+
+The window itself (`count`) is a default for words nobody has looked at individually, not a
+ceiling: a word named explicitly in `[word]` gets a brief regardless of rank, the same way a
+two-key-or-fewer outline already does regardless of rank. That is only done when every one of
+three things holds, checked mechanically rather than by eye: Plover's own outline saves at
+least three whole keys over what the rules generate for the word (a one- or two-key saving this
+far down the frequency list was rejected even where it existed, since it barely moves the
+frequency-weighted cost the rare tier is judged on); that outline's first and last consonants
+are a whole cluster toward the word's real first and last sound, never a fragment of one (the
+same check a plain `plover`/`lapwing` source above already runs through); and claiming it does
+not take a stroke a commoner word already has by the rules (checked by rebuilding — a rarer
+word losing its own outline to a star form, the ordinary cost of adding any brief at all, is
+fine; a commoner one losing its outline because a rarer word's hand-picked brief grabbed it
+first would not be). `rules/briefs.toml` lists each word this has been done for and what it
+saves.
+
+Next: **[phonetic rules](phonetic-rules.md)** — how a word with no brief gets its stroke instead.

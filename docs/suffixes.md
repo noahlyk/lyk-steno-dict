@@ -94,3 +94,6 @@ continuations, each one still just a syllable through the same rule.
   these words), not a fixed property of the suffix the way every other entry in this file is. A
   standalone stroke can't know that in advance, so this one stays per-word, through the normal
   rules, rather than a stroke here.
+
+Next: **[punctuation & commands](punctuation.md)** — the reserved strokes pinned ahead of every
+word, now with the actual content instead of just the structural mention.

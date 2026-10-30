@@ -37,17 +37,20 @@ as fine as a brief has always been), and free to drop a sound entirely rather th
 *part* of a key combination the rules only ever use *together* for one sound (`good`'s old Plover
 brief kept half of its "g" sound's four keys and dropped the rest, reading back as a different,
 wrong consonant) — a fragment like that is confusing in a way neither a whole memorized shortcut
-nor a cleanly dropped sound ever is. See [the theory page](docs/theory.md) for the rule.
+nor a cleanly dropped sound ever is. See [the briefs chapter](docs/briefs.md) for the rule.
 
 ## Documentation
 
-The full literature lives in [`docs/`](docs/README.md) — start there for the table of contents.
-Quick links:
+The full literature lives in [`docs/`](docs/README.md), written to be read start to finish, not
+looked up — **start there for the full table of contents and reading order.** A few waypoints:
 
-- **[How lyk writes a word](docs/theory.md)** — the rule book: briefs, phonetic rules, spelling,
-  prefixes, syllables, brevity, the join key. Read this first.
-- **[Suffix strokes](docs/suffixes.md)** — every standalone suffix (`^-G` "ing", `^-D` "ed", ...),
-  the one rule they're derived from, and what isn't covered yet.
+- **[The join key](docs/join-key.md)** — why word boundaries are explicit. Read this first.
+- **[Briefs](docs/briefs.md)** — the rule book for the commonest words' outlines.
+- **[The full suffix table](docs/suffixes.md)** — every standalone suffix (`^-G` "ing", `^-D`
+  "ed", ...), the one rule they're derived from, and what isn't covered yet.
+- **[Punctuation & commands](docs/punctuation.md)** and
+  **[fingerspelling & misc keys](docs/fingerspelling.md)** — the reserved strokes pinned ahead of
+  every word.
 - **[The orthographic fallback](docs/fallback.md)** — what a stroke that misses the dictionary
   reads back as, and how that logic becomes keymux's WASM plugin, generated rather than hand-copied.
 
@@ -190,6 +193,6 @@ end up with a star form because another word sounds the same and has the plain o
 and `sight`, `don` and `done`); `build` lists the commonest. About 100 of the 100,000 words can't
 be written by these rules yet, nearly all names and interjections (`hm`, `schmidt`, `vlad`).
 
-These numbers move whenever a brief or suffix is added — see [the theory page](docs/theory.md) for
-the rule, and run `cargo run --release -- score --check-readme` before committing a rules change
+These numbers move whenever a brief or suffix is added — see [the docs](docs/README.md) for the
+rule, and run `cargo run --release -- score --check-readme` before committing a rules change
 to catch drift here automatically.

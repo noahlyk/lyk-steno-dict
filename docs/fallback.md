@@ -2,7 +2,7 @@
 
 [← back to the table of contents](README.md) · [← back to the main README](../README.md)
 
-Every phonetic table in [the theory](theory.md) (rule 2) also reads the other way. `Rules::resolve`
+Every phonetic table in [phonetic rules](phonetic-rules.md) also reads the other way. `Rules::resolve`
 takes a stroke that missed the dictionary and reads its keys back into sounds, the same way they
 would have been written, spelled plainly rather than in real orthography (there is no word on
 record to say how it's actually spelled). Every key on this keyboard means something alone,
@@ -72,3 +72,6 @@ fixed, unchanged template around it. Nothing about the phonetic reading is hand-
 re-derived by eye anymore, which is what let the old hand-maintained copy drift and invent a
 schwa ("uh") for a bare consonant that resolve itself never did. Regenerate and redeploy this
 file after any change to the rule tables, rather than hand-editing the deployed plugin directly.
+
+This is the last chapter of the theory itself. Next: **[where lyk stands](../README.md#where-lyk-stands)** —
+the benchmarks, a measured result of everything above rather than a rule of its own.
