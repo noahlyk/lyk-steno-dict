@@ -34,6 +34,16 @@ only looks at words inside the brief window itself (`briefs.count`) that are not
 landing a brief: a word briefed regardless of what it drops, like `a` pinned to `AEU`, was never
 going to need its own plain reading (`A`) at all, so it does not count as a collision.
 
+That fewest-keys ranking also decides what happens when the very best candidate is already
+someone else's: words settle commonest-first, so a common word's top pick can already belong to
+an even commoner one (`from`'s own best candidate, bare `R`, is already `are`'s). Rather than
+giving up there and falling back to the word's full, multi-stroke phonetic outline, every
+candidate is tried in the same fragment-safe order, and the first one nobody else already has
+wins (`from` falls through `R` to land on `TPR` instead — three keys, not the six its own rules
+outline would have cost). This only ever reaches further down its *own* ranked list; it never
+reconsiders a word already settled, so it costs nothing to a commoner word and changes nothing
+about which word wins a shared outline.
+
 The window itself (`count`) is a default for words nobody has looked at individually, not a
 ceiling: a word named explicitly in `[word]` gets a brief regardless of rank, the same way a
 two-key-or-fewer outline already does regardless of rank. That is only done when every one of
