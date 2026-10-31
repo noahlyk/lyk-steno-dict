@@ -55,6 +55,23 @@ const BOTTOM: u8 = 1;
 const TOP: u8 = 2;
 const BOTH: u8 = 3;
 
+/// Per-finger coupling cost, x10 to stay in clean integers: `index` is the baseline (1.0x),
+/// `little`/`middle` ~1.3x, `ring` ~1.8x - a linear mapping from Häger-Ross & Schieber's measured
+/// individuation indices (~0.978/~0.944/~0.936/~0.903), kept deliberately under 2x per the
+/// research's own caution against overfitting an ~8%-spread proxy metric into a dramatic
+/// multiplier. Used for both row-transition and gap costs - see the module doc.
+mod coupling {
+    pub const INDEX: u32 = 10;
+    pub const MIDDLE: u32 = 13;
+    pub const LITTLE: u32 = 13;
+    pub const RING: u32 = 18;
+}
+
+/// Physical finger order, pinky to index, with each slot's coupling weight alongside it.
+const LEFT_COUPLING: [u32; 4] = [coupling::LITTLE, coupling::RING, coupling::MIDDLE, coupling::INDEX];
+/// Physical finger order, index to pinky (mirrored from the left hand).
+const RIGHT_COUPLING: [u32; 4] = [coupling::INDEX, coupling::MIDDLE, coupling::RING, coupling::LITTLE];
+
 /// A finger's row state from the bits it owns: `None` if unpressed, else which row(s) are down.
 fn row(bits: u32, top_bit: u32, bottom_bit: u32) -> Option<u8> {
     let state = (u8::from(bits & top_bit != 0) * TOP) | (u8::from(bits & bottom_bit != 0) * BOTTOM);
@@ -63,11 +80,24 @@ fn row(bits: u32, top_bit: u32, bottom_bit: u32) -> Option<u8> {
 
 /// A single stroke's ergonomic components. See the module doc for what each one means.
 pub struct Score {
+    /// Raw count of row-mismatched adjacent finger pairs (unweighted - see `transition_cost` for
+    /// the finger-identity-weighted version `weighted()` actually uses). Kept for tests/diagnostics
+    /// that care about the raw shape rather than its cost; not read by `weighted()` itself.
+    #[allow(dead_code)]
     pub transitions: u32,
+    /// Raw count of skipped-finger gaps (unweighted - see `gap_cost`). Same caveat as `transitions`.
+    #[allow(dead_code)]
     pub gaps: u32,
     pub double_presses: u32,
     /// Pinky key presses, excluding the join bit - see the module doc.
     pub pinky_keys: u32,
+    /// Right-pinky stretch-key (`D`/`Z`) presses specifically - a structural overload tax separate
+    /// from the general pinky leverage tax.
+    pub stretch_keys: u32,
+    /// Sum of `COUPLING` weights across every row-mismatched adjacent finger pair.
+    pub transition_cost: u32,
+    /// Sum of `COUPLING` weights across every skipped-finger gap.
+    pub gap_cost: u32,
 }
 
 /// Scores one stroke's physical comfort. Independent of word, frequency, or key count - just the
@@ -91,31 +121,62 @@ pub fn score(stroke: Stroke) -> Score {
         row(bits, T2 | D, S2 | Z),
     ];
 
-    let walk = |fingers: &[Option<u8>]| -> (u32, u32, u32) {
-        let active: Vec<u8> = fingers.iter().filter_map(|&f| f).collect();
-        let transitions = active.windows(2).filter(|w| w[0] & w[1] == 0).count() as u32;
-        let doubles = active.iter().filter(|&&f| f == BOTH).count() as u32;
-        let gaps = (1..fingers.len() - 1)
-            .filter(|&i| fingers[i].is_none() && fingers[i - 1].is_some() && fingers[i + 1].is_some())
-            .count() as u32;
-        (transitions, doubles, gaps)
+    let walk = |fingers: &[Option<u8>; 4], coupling: &[u32; 4]| -> (u32, u32, u32, u32, u32) {
+        // (original slot index, row state), active fingers only - transitions are checked between
+        // *consecutively active* fingers, same as the dictionary-scale behavior before this
+        // revision: an inactive finger between two active ones is a gap, not a transition skip.
+        let active: Vec<(usize, u8)> =
+            fingers.iter().enumerate().filter_map(|(i, &f)| f.map(|row| (i, row))).collect();
+        let mut transitions = 0;
+        let mut transition_cost = 0;
+        let mut doubles = 0;
+        for &(_, row) in &active {
+            if row == BOTH {
+                doubles += 1;
+            }
+        }
+        for pair in active.windows(2) {
+            let (&(i, row), &(j, next_row)) = (&pair[0], &pair[1]);
+            if row & next_row == 0 {
+                transitions += 1;
+                transition_cost += coupling[i] + coupling[j];
+            }
+        }
+        let mut gaps = 0;
+        let mut gap_cost = 0;
+        for i in 1..fingers.len() - 1 {
+            if fingers[i].is_none() && fingers[i - 1].is_some() && fingers[i + 1].is_some() {
+                gaps += 1;
+                gap_cost += coupling[i];
+            }
+        }
+        (transitions, transition_cost, doubles, gaps, gap_cost)
     };
 
-    let (lt, ld, lg) = walk(&left);
-    let (rt, rd, rg) = walk(&right);
+    let (lt, ltc, ld, lg, lgc) = walk(&left, &LEFT_COUPLING);
+    let (rt, rtc, rd, rg, rgc) = walk(&right, &RIGHT_COUPLING);
     let pinky_keys = u32::from(bits & S != 0) + (bits & (T2 | S2 | D | Z)).count_ones();
+    let stretch_keys = (bits & (D | Z)).count_ones();
 
-    Score { transitions: lt + rt, gaps: lg + rg, double_presses: ld + rd, pinky_keys }
+    Score {
+        transitions: lt + rt,
+        gaps: lg + rg,
+        double_presses: ld + rd,
+        pinky_keys,
+        stretch_keys,
+        transition_cost: ltc + rtc,
+        gap_cost: lgc + rgc,
+    }
 }
 
-/// A single weighted number, low = comfortable. Starting weights, calibrated by eye against known
-/// cases (`STR`/`SPR` clusters score high and are a commonly-cited awkward pattern in real steno;
-/// foundational digraphs like `TK`/`PW` score low), not yet tuned against anything more
-/// rigorous. See `docs/decisions.md` for the real distribution these produce.
+/// A single weighted number, low = comfortable. The coupling weights (`transition_cost`,
+/// `gap_cost`) carry the literature-grounded ordering; `pinky_keys`/`stretch_keys` are a separate,
+/// smaller leverage/overload tax. See the module doc for the research behind each term and
+/// `docs/decisions.md` for the real distribution these produce.
 #[must_use]
 pub fn weighted(stroke: Stroke) -> u32 {
     let s = score(stroke);
-    s.transitions * 3 + s.double_presses + s.gaps * 2 + s.pinky_keys
+    s.transition_cost + s.gap_cost + s.double_presses + s.pinky_keys + s.stretch_keys * 2
 }
 
 /// A whole outline's ergonomic cost: the sum of each of its strokes' own.
@@ -177,19 +238,26 @@ mod tests {
         assert_eq!(score(joined).pinky_keys, 0);
     }
 
-    /// Every ceiling here is set a little above a real scan of the dictionary (see
-    /// `docs/decisions.md`'s ergonomics entry for the exact numbers) - loose enough that adding a
-    /// handful of new words doesn't break it, tight enough that a real regression (a rule change
-    /// that systematically makes a whole class of words less comfortable) still fails it.
+    /// A score at or above this is "bad" for the `bad_pct_ceiling` counts below - rescaled from the
+    /// pre-kinematics-revision model's cutoff of 8 (itself ~3.9x that model's own top-1,000 average
+    /// of ~2.05) to stay proportionate under the new, larger coupling-weighted scale (new top-1,000
+    /// average ~9.99, so ~4x that).
+    const BAD_SCORE: u32 = 40;
+
+    /// Every ceiling here is set a little above a real scan of the dictionary, post-kinematics
+    /// revision (see `docs/decisions.md`'s ergonomics entries for the exact numbers and the research
+    /// behind the new scale) - loose enough that adding a handful of new words doesn't break it,
+    /// tight enough that a real regression (a rule change that systematically makes a whole class of
+    /// words less comfortable) still fails it.
     #[test]
     fn the_real_dictionary_stays_within_known_ergonomic_ceilings() {
         let setup = dictionary_fixture::setup();
         let lyk = dictionary_fixture::cheapest();
 
         let bands = [
-            Band { name: "top 1,000", max_rank: 999, avg_ceiling: 2.5, bad_pct_ceiling: 3.5 },
-            Band { name: "1,000-10,000", max_rank: 9_999, avg_ceiling: 3.6, bad_pct_ceiling: 7.5 },
-            Band { name: "10,000+", max_rank: usize::MAX, avg_ceiling: 4.3, bad_pct_ceiling: 11.5 },
+            Band { name: "top 1,000", max_rank: 999, avg_ceiling: 11.0, bad_pct_ceiling: 35.0 },
+            Band { name: "1,000-10,000", max_rank: 9_999, avg_ceiling: 17.0, bad_pct_ceiling: 48.0 },
+            Band { name: "10,000+", max_rank: usize::MAX, avg_ceiling: 19.0, bad_pct_ceiling: 49.0 },
         ];
 
         for band in &bands {
@@ -207,7 +275,7 @@ mod tests {
             }
             let n = scores.len();
             let avg = scores.iter().map(|&s| f64::from(s)).sum::<f64>() / n as f64;
-            let bad = scores.iter().filter(|&&s| s >= 8).count();
+            let bad = scores.iter().filter(|&&s| s >= BAD_SCORE).count();
             let bad_pct = f64::from(u32::try_from(bad).unwrap()) * 100.0 / n as f64;
             assert!(
                 avg <= band.avg_ceiling,
@@ -217,7 +285,7 @@ mod tests {
             );
             assert!(
                 bad_pct <= band.bad_pct_ceiling,
-                "{}: {bad_pct:.2}% of words score >= 8, exceeds ceiling {}%",
+                "{}: {bad_pct:.2}% of words score >= {BAD_SCORE}, exceeds ceiling {}%",
                 band.name,
                 band.bad_pct_ceiling
             );

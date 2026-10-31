@@ -597,3 +597,38 @@ compete purely on cost, same as everything else. Net effect was not neutral - it
 change wants to reintroduce sound-correspondence as a requirement for any candidate, that is
 reopening the day-4 reversal, not a neutral correctness fix** - the two are in direct, confirmed
 tension, and the reversal is the one the user actually wants.
+
+**The ergonomics model was rebuilt from a real hand-kinematics literature review, overturning its
+own founding assumption (`src/ergonomics.rs`).** The original model (see its earlier entry above)
+taxed the pinky specifically as "the weak finger" and weighted every row-mismatched adjacent finger
+pair identically, both chosen by eye. A literature review (Häger-Ross & Schieber, *J Neurosci* 2000,
+instrumented-glove finger-individuation measurements; Zatsiorsky/Li/Latash 1998 on multi-finger
+force enslaving; standard hand anatomy on shared extensor tendons) found **the ring finger, not the
+pinky, is the least independently-movable digit** - individuation indices of ~0.978 (index), ~0.944
+(little), ~0.936 (middle), ~0.903 (ring), out of 1.0. Index and little both have at least a partial
+independent extensor tendon; middle and ring share tendon slips with no independent muscle of their
+own at all, and ring measures worst of the two. Revised: row-transition and gap costs are now
+weighted by *which* fingers are involved (`index`=1.0x, `middle`/`little`=1.3x, `ring`=1.8x, a
+direct, deliberately-conservative linear mapping from the measured individuation spread, kept under
+2x per the research's own caution against overfitting an ~8%-spread proxy into a dramatic
+multiplier) instead of a flat per-transition/per-gap constant. The pinky-usage tax is kept, but
+re-justified on grip-strength/leverage research and this layout's own structural fact (the right
+pinky alone owns two columns) rather than on independence, since the independence data says pinky
+is *not* the worst digit - folding it into the same coupling table would have misattributed the
+reason. Same-finger double presses (`TK`, `PW`) stay free, the one factor the research fully
+confirmed as already correct. **A real, stated ceiling, not completeness**: the one study that
+measured chord-typing performance directly against a motor-difficulty model (Raij/Gopher/Kimchi
+1987) needed a second, independent "pattern-recognizability" factor to reach ~60% explained
+variance - this module still doesn't attempt memorability, only the biomechanical half of the
+picture. The dictionary-wide score scale grew roughly 7-8x as a direct consequence (top-1,000
+average 2.05 -> 9.99 on the old vs. new scale), so `the_real_dictionary_stays_within_known_
+ergonomic_ceilings`'s ceilings and its "bad" cutoff (8 -> 40) were rescaled proportionately, not
+loosened - measured against the real post-revision distribution the same way every other threshold
+in this project is. No change to `quote_corpus`'s numbers resulted (ergonomics remains a small
+tie-break term under `candidate_cost`'s stroke/key weighting, and no candidate in that 103-passage
+corpus happened to be exactly tied on strokes+keys with a different ergonomics ranking under the
+new weights) - this revision is about correctness and rigor for future tie-breaks, not a
+terseness win in itself. **If this gets reverted to flat per-transition weighting "for simplicity,"
+it's reintroducing an assumption (pinky is the weak finger, all mismatches cost the same) the
+literature specifically contradicts** - re-derive the research summary above before touching the
+coupling weights, don't just restore the old numbers.
