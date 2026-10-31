@@ -16,6 +16,17 @@ pressed. (An earlier, separately hand-maintained copy of this logic inside keymu
 got this wrong for a while — see "Keeping the plugin honest" below for why that can't happen
 again.)
 
+**A continuation stroke that's one of `rules/suffixes.toml`'s own chords always reads as that
+suffix's real spelling**, not a generic phonetic guess at its bare consonants. `resolve` checks
+this table first for any stroke after the first that carries the join key, before falling through
+to the ordinary onset/vowel/coda read-back: `+-D` after some stroke with no dictionary entry at all
+reads as "ed", not the bare consonant "d" a stroke with no vowel key down would otherwise get.
+This is unconditional — a suffix never needed a *specific* composed outline to already be a
+literal dictionary entry to read correctly, the same way the reserved commands, punctuation, and
+fingerspelling tables are unconditional. (A suffix struck entirely on its own, no stroke before it,
+is a different case: that's already its own literal dictionary entry, so `resolve` is never even
+reached for it.)
+
 **A true miss** — where the rules give up outright and the engine would fall back to a raw echo
 of the keys — is only a stroke with nothing left once the star and join keys are set aside: no
 onset, no vowel, no coda, because the star and join alone carry no sound.

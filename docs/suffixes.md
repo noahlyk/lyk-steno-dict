@@ -80,6 +80,18 @@ continuations, each one still just a syllable through the same rule.
 | `+U/+SEU` | -cy/-sy | *priva-cy*, *fanta-sy*, *poli-cy*, *democra-cy* — the same bare-AH first stroke as "-ity" (two different suffixes may share an opening stroke; only the whole outline has to stay distinct), then S + the "-y" vowel kept |
 | `+U/+TPAOEU` | -ify/-fy | *clar-ify*, *simpl-ify*, *ident-ify* — the same bare-AH first stroke again, then F + AY kept (AY never reduces, same as "-ize") |
 
+## A suffix stroke always reads right, dictionary or not
+
+Every single-stroke chord above is also known directly to `Rules::resolve` (and the deployed
+plugin that mirrors it) — not just as a standalone dictionary entry, but unconditionally, for any
+continuation stroke that misses the dictionary entirely. `STKPW/+-D` ("z" has no dictionary entry
+at all, let alone combined with any suffix) still reads back as "zed", not "zd": the continuation
+stroke's bare chord is looked up in this table before the generic phonetic onset/vowel/coda
+read-back ever runs on it. See **[the fallback](fallback.md)** for the mechanism. The two-syllable
+table below isn't part of this yet, for the same reason it isn't part of the backup-entry pass
+below: a continuation is always read one stroke at a time, and a suffix that takes two strokes has
+nothing here to match against stroke-by-stroke yet.
+
 ## Backup stem+suffix entries
 
 This table isn't only a reference for striking a suffix on its own — a later pass in `generate()`

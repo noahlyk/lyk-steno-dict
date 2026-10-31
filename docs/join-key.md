@@ -11,7 +11,8 @@ That one convention is what the rest of this theory leans on, chapter after chap
   fit on the stroke before it — is never mistaken for a word of its own, so it can be as short as
   a single key: `+-G` for "-ing", `+-D` for "-ed", with no risk of colliding with some unrelated
   one- or two-key word that happens to share the same letters. See **[suffixes](suffixes.md)** and
-  **[syllables & folding](syllables.md)** for what that buys.
+  **[syllables & folding](syllables.md)** for what that buys. A suffix's own chord reads correctly
+  after *any* stroke this way, dictionary entry or not — see **[the fallback](fallback.md)**.
 - A stem's own outline and a continuation stroke can share the same keys with no clash, because
   the join key alone is what tells them apart — nothing about the keys themselves has to.
 - It solves, by construction, a problem other theories patch around: a "word-boundary conflict"
