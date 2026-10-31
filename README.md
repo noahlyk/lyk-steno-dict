@@ -19,9 +19,9 @@ once would be.
 <!-- lyk:overall-table:start -->
 | Theory | Keys/Stroke, weighted by how often each word is said |
 |---|---|
-| Lyk | 3.40 |
-| Plover | 3.51 |
-| Lapwing | 3.93 |
+| Lyk | 3.37 |
+| Plover | 3.52 |
+| Lapwing | 3.94 |
 <!-- lyk:overall-table:end -->
 
 This one number is a composition of two things: how many keys a stroke takes for a word of a
@@ -112,10 +112,10 @@ they put on a continuation stroke, which the join key replaces) for:
 <!-- lyk:score-table:start -->
 | Syllables | Same as Plover or Lapwing | Plover | Lapwing | Keys/Stroke (Lyk) | Keys/Stroke (Plover) | Keys/Stroke (Lapwing) |
 |---|---|---|---|---|---|---|
-| 1 | 90% | 78% | 83% | 5.66 | 5.66 | 5.83 |
-| 2 | 59% | 45% | 52% | 5.63 | 4.93 | 5.27 |
-| 3 | 38% | 26% | 32% | 5.24 | 4.80 | 5.14 |
-| 4+ | 23% | 17% | 18% | 5.24 | 4.97 | 5.22 |
+| 1 | 90% | 78% | 83% | 5.59 | 5.66 | 5.83 |
+| 2 | 59% | 45% | 52% | 5.56 | 4.93 | 5.27 |
+| 3 | 38% | 26% | 32% | 5.22 | 4.80 | 5.15 |
+| 4+ | 23% | 17% | 18% | 5.38 | 4.97 | 5.22 |
 <!-- lyk:score-table:end -->
 
 "Keys/Stroke" above counts every distinct word once, regardless of how rare it is. The same
@@ -125,10 +125,10 @@ of very common words dominate it and a long tail of rare ones barely move it:
 <!-- lyk:usage-table:start -->
 | Syllables | Keys/Stroke (Lyk, by frequency) | Keys/Stroke (Plover, by frequency) | Keys/Stroke (Lapwing, by frequency) |
 |---|---|---|---|
-| 1 | 3.01 | 3.16 | 3.58 |
-| 2 | 4.80 | 4.70 | 5.00 |
-| 3 | 4.88 | 4.93 | 5.25 |
-| 4+ | 5.11 | 5.24 | 5.50 |
+| 1 | 3.02 | 3.17 | 3.59 |
+| 2 | 4.73 | 4.70 | 5.00 |
+| 3 | 4.57 | 4.93 | 5.25 |
+| 4+ | 4.93 | 5.24 | 5.50 |
 <!-- lyk:usage-table:end -->
 
 One-syllable words drop sharply under this weighting for every theory, not just Lyk, because a
@@ -171,35 +171,38 @@ Longer words differ mostly where Plover and Lapwing have a brief, and where Lyk 
 
 | | Strokes | Keys |
 |---|---|---|
-| Lyk | 1.032 | 3.560 |
-| Plover | 1.040 | 3.710 |
-| Lapwing | 1.041 | 4.106 |
+| Lyk | 1.016 | 3.435 |
+| Plover | 1.039 | 3.717 |
+| Lapwing | 1.041 | 4.114 |
 
 By how common the word is (`build` prints this), keys per word:
 
 | Words | Share of all words said | Lyk | Plover | Lapwing |
 |---|---|---|---|---|
-| top 100 | 58% | 2.28 | 2.45 | 2.89 |
-| 100 to 1,000 | 28% | 4.64 | 4.81 | 5.17 |
-| 1,000 to 5,000 | 10% | 5.90 | 6.14 | 6.42 |
-| 5,000 to 20,000 | 4% | 7.88 | 7.47 | 7.88 |
-| 20,000+ | 1% | 9.94 | 8.92 | 9.30 |
+| top 100 | 58% | 2.24 | 2.48 | 2.91 |
+| 100 to 1,000 | 28% | 4.60 | 4.81 | 5.17 |
+| 1,000 to 5,000 | 10% | 5.54 | 6.14 | 6.42 |
+| 5,000 to 20,000 | 4% | 6.81 | 7.47 | 7.88 |
+| 20,000+ | 1% | 8.60 | 8.91 | 9.29 |
 
 The top thousand words are briefs in all three, which is why the dictionaries are close: the
-rules can only move the rest. Lyk now beats Plover through the top 1,000 words and roughly ties
-it through 5,000; the remaining gap sits in the rarer tiers, where Plover's decades of hand-picked
-briefs are hard for a uniform rule to beat.
+rules can only move the rest. Lyk now beats Plover across every frequency tier, including the
+rarest words — every word's primary outline is settled by a single global optimization over every
+legal candidate at once (briefs, the plain rules reading, brevity, the star ladder, all competing
+on cost together), not a commonest-word-first pass that only ever revisits a word's own brief
+attempt; see [briefs](docs/briefs.md) for how.
 
 That is with the join key on every continuation stroke counted, and with a Plover outline counted
 only when Lapwing has it too: Plover's `main.json` is full of misstrokes (`O` for *to*, `SP` for
-*and*) that would otherwise make it look a third of a key cheaper than it is. About 1,200 words
-end up with a star form because another word sounds the same and has the plain outline (`site`
-and `sight`, `don` and `done`); `build` lists the commonest. About 500 of the 100,000 words can't
-be written by these rules yet, nearly all names and interjections (`hm`, `schmidt`, `vlad`). On
-top of all that, about 8,500 words also get a second, backup entry built from an already-placed
-shorter word's own outline plus whatever sounds are left over (`build`'s own outline plus a
-continuation stroke also reaches `building`, whether or not that agrees with `building`'s own
-cheapest outline) — see [syllables & folding](docs/syllables.md) for the rule.
+*and*) that would otherwise make it look a third of a key cheaper than it is. Close to 4,000 words
+end up with a star form because some other, more valuable word's candidate won the plain outline
+instead (`site` and `sight`, `don` and `done`, but also any other collision the global optimizer
+settles this way now, not just a sound-alike pair); `build` lists the commonest. About 300 of the
+100,000 words can't be written by these rules yet, nearly all names and interjections (`hm`,
+`schmidt`, `vlad`). On top of all that, close to 20,000 words also get a second, backup entry built
+from an already-placed shorter word's own outline plus whatever sounds are left over (`build`'s own
+outline plus a continuation stroke also reaches `building`, whether or not that agrees with
+`building`'s own cheapest outline) — see [syllables & folding](docs/syllables.md) for the rule.
 
 These numbers move whenever a brief or suffix is added — see [the docs](docs/README.md) for the
 rule, and run `cargo run --release -- score --check-readme` before committing a rules change
