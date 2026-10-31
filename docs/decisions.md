@@ -451,3 +451,129 @@ multi-stroke backups available underneath it. What changed is *how arbitrary tha
 outline is allowed to be*, not whether the one-outline/many-backups shape exists at all. See the
 one-stroke-per-word entry above and
 [the table of contents](README.md)'s own opening paragraph for the canonical wording.
+
+## Dictionary generation became a real global optimization problem
+
+**The day-4 philosophy reversal above was implemented, not just declared: `generate()`'s old
+commonest-first greedy pass is gone, replaced by enumerate every candidate → peel the easy ones →
+solve the rest as a real min-cost assignment problem (`src/generate.rs`: `Candidate`,
+`candidate_cost`, `enumerate_candidates`, `solve_contested`).** The two complaints that motivated
+this are both fixed directly, not worked around: `best_brief` used to source candidates from
+*either* `setup.gold.plover` *or* `setup.gold.lapwing`, gated by a frequency window - lyk's own
+rules-derived reading never got a chance to compete at all, which is why `take`'s own short Plover
+brief (`TAEBG`) worked but `takes`'s otherwise-identical case (Plover's own listed candidate is the
+longer `TAEUBGS`; lyk's own shorter spelling-variant reading, `TAEBGS`, was never tried against it)
+didn't - confirmed fixed (`generate::tests::the_take_takes_inconsistency_is_gone_from_the_candidate_pool`).
+And a word settled early (commonest-first) could never be revisited once a later, rarer word's own
+circumstances might have made a different global arrangement cheaper overall - the root cause the
+plan behind this traced `make`=`AEUBG`, `but`=`UT`, the ten stranded-word fixes, and the `on`/
+`from`/`no`/`then`/`day`/`which` fragment-check overrides all back to.
+
+**Every word's own candidate pool is now genuinely exhaustive**, merging in one list: both gold
+dictionaries' listed outlines (`matches_real_consonants` now a blanket filter on every raw one, not
+just a sort key `best_brief` used to apply only when ranking - new rigor over what shipped before),
+lyk's own plain rules reading (always present, brief or not), the spelling-told-apart variant for a
+homophone group (`rules.variant`, offered alongside the plain reading rather than replacing it - the
+solver decides who keeps which, on cost and frequency, the same way it settles any other contested
+text), every brevity-ladder shortening, and the full four-step star ladder on top of both the plain
+reading and the spelling variant. A `[word]` literal override in `rules/briefs.toml` is the one
+exception: it still forces exactly one candidate, a human decision never reopened to competition,
+resolved first into `taken` the same way reserved outlines always have been.
+
+**The headline acceptance gate**: all 18 `rules/briefs.toml` `[word]` overrides whose own comments
+cited this exact architectural gap (`make`, `but`, `on`/`from`/`no`/`then`/`day`, `which`, and the
+ten stranded-word fixes) were removed, and the new pipeline was confirmed to reproduce or beat every
+one of them unprompted (`generate::tests::the_acceptance_gate_reproduces_or_beats_every_removed_override`).
+Twelve reproduce or beat their own override's exact outline directly. The other six
+(`on`/`from`/`no`/`then`/`day`/`which`) are a different shape of result worth spelling out: their
+own literal text (`"OB"`, `"PR"`, `"PHO"`, `"THEB"`, `"TAEU"`, `"KH"`) was itself a hand-picked
+exploit of a gap in `best_brief` - a half-held chord `matches_real_consonants` would reject from any
+ordinary candidate, bypassed only because a literal override skips that check entirely. The new
+blanket filter closes that exact gap, so none of those six literal texts is a legal candidate
+anymore at all - what the new pipeline reproduces instead, unprompted, is each word's own correct,
+full phonetic reading (`OPB`, `TPR`, `TPHO`, `THEPB`, `TKAEU`, `WHEUFP`) - exactly the alternative
+each override's own comment already named as what the exploit was avoiding. That is "beats the
+override," read correctly: the exploit is gone, and the fallback it was built to improve on is
+exactly what ships now.
+
+**Three real bugs were found and fixed while building this, each worth knowing about on its own:**
+
+1. **Peeling by candidate-list length left ~99% of the dictionary "contested."** The first
+   implementation tried to settle the easy majority of words before handing the hard remainder to
+   the solver by looking for words with exactly one candidate left. That number is almost never one
+   for any word with a plain rules reading, because the full four-step star ladder (source 5 in
+   `enumerate_candidates`) is *always* present as a fallback, regardless of whether the word's own
+   best pick is actually contested by anyone - so nearly every word starts with five-plus
+   candidates. Measured directly: 99.3% of the dictionary "contested," and a solver built for "a
+   sparse, few-hundred-to-low-thousand-word subgraph" turned a 100,000-word build into a multi-
+   minute hang. Fixed by changing the peeling test to a word's own *cheapest remaining* candidate
+   being the unique cheapest among every other remaining word (sort each list once, compare heads).
+2. **That fix was still unsafe, in a way that silently produced a worse dictionary rather than
+   hanging.** A word is only safe to peel when its own cheapest candidate's *text* has no other
+   remaining word as a claimant *anywhere* in that word's own list - not merely "no one else's own
+   *top* pick is this text." The difference showed up as a real regression: `on`'s own natural
+   second choice, `OPB`, has no competing top pick from anyone else (`on` was still holding out for
+   its own cheaper, contested `O`), so the far rarer word `gone` - for whom `OPB` genuinely was the
+   cheapest, uncontested-by-anyone-else-at-the-top pick - got to claim it immediately, before `on`
+   ever got a say. `on` fell all the way to `AUPB` (4 keys) instead of its own correct `OPB` (3
+   keys) - worse than even the removed override. Fixed by only peeling a word's cheapest candidate
+   when it appears in no other remaining word's list at all, full stop.
+3. **Edge weight was first `common - rank`, per the plan's own original formula - measurably wrong
+   once built.** The idea was "strictly frequency-ordered, bounded well under `u64` overflow," but
+   `common - rank`'s own dynamic range collapses for any reasonably common word once `common` is
+   100,000: "he" (rank 17) and "heh" (rank 2,191) differ by over 130x in actual usage count but
+   under 2% in `common - rank`. That let a rare word's merely-somewhat-worse fallback out-arbitrate
+   a far commoner word's much better option purely because the two words' weights looked nearly
+   identical to the solver - measured directly as a real regression (lyk losing to Plover in
+   aggregate keys/stroke, not just a small one). Fixed by using `setup.count[word]` - actual usage
+   count, the same field `build`'s own "weighted by how often it is said" report already uses -
+   which has the dynamic range frequency weighting is actually for, with no overflow risk at the
+   scale this dictionary ever reaches.
+
+**A real Hall-violation (more mutually-exclusive words in one connected component than it has
+distinct texts for - a genuine multi-way homophone/near-homophone cluster tighter than its own star
+ladder can resolve) is still possible, and is handled inside `solve_contested` itself now, not left
+to the caller.** Every word gets one extra, private edge straight to the sink, costed at 1,000x that
+word's own worst real option (which still scales with that word's own frequency weight, since the
+real edges it's computed from already have it folded in) - this is what makes the solver correctly
+sacrifice whichever word in an over-subscribed cluster has the least to lose, rather than whichever
+one a raw max-flow search happens to run out of augmenting paths on first (confirmed this mattered:
+an earlier version of this exact mechanism, before the per-word scaling, once left "cat" - the
+common word in a `cat`/`kat`/`katt`/`khat` true-homophone cluster - without any outline at all,
+while its three far rarer cluster-mates kept theirs).
+
+**Every `HashMap`/`HashSet`-iteration-order-dependent point in the new pipeline now sorts
+explicitly.** Rust's default hasher is randomized per process; collecting a word's own candidates,
+a connected component's own members, or a text's own claimant list straight out of a `HashMap`
+without an explicit, deterministic order meant a genuine cost-tie's *specific* winner (not the
+total cost, which a true tie keeps identical either way) could differ run to run - confirmed
+directly: the quote-corpus benchmark's own word-level counts moved by one or two words between
+otherwise-identical runs before this fix. This project's whole ethos is exact and reproducible, not
+"equally good, whichever one happened to come up" - every such collection point now sorts by
+(cost, outline text) or by word text before being used.
+
+**The contested-set-size invariant the whole algorithm choice rests on turned out to be a real,
+different number than the plan estimated, not a bug to chase back to the original guess.** The plan
+expected peeling to leave "hundreds to low thousands" of words genuinely contested (under 5% of the
+dictionary); a real, correctly-peeled run measures roughly a quarter of it. The blanket
+`matches_real_consonants` filter's deeper fragment-drops mean far more words now legitimately
+converge on the same small handful of very short, nearly-bare outlines than a single-source brief
+pool ever produced - a real, structural property of this design, confirmed not to be the 99.3%-style
+bug above (see `quality::the_contested_set_after_peeling_stays_a_minority_of_the_dictionary`, set at
+a real, measured ceiling rather than the plan's original estimate). What keeps the solver fast at
+this scale isn't a small raw contested count - it's that the contested set splits into many small,
+mutually-independent connected components (two words share an edge only if they share a candidate
+text, transitively) rather than one giant tangle, so `solve_contested` runs once per small component
+instead of once over the whole quarter of the dictionary at once.
+
+**Net result, measured against the same quote-corpus benchmark and the same README benchmark this
+session's earlier entries already cite**: lyk's aggregate keys across the 103-passage corpus went
+from 4,640 to 4,409 (now 6.1% cheaper than Plover's 4,694 and 12.5% cheaper than Lapwing's 5,039, up
+from 1.2%/7.5%); the words-individually-worse-than-Plover share, the one number this rewrite was
+expected to cost something on, ended up landing back within a hair of its original value (9.5% ->
+9.9%) once the peeling bug above was fixed, not stranded at the 11-12% an earlier, buggy measurement
+of this same rewrite briefly showed. The README's own overall number moved from 3.40 to 3.37
+keys/stroke, still beating Plover's 3.51 -> 3.52 and Lapwing's 3.93 -> 3.94. `quote_corpus`'s
+thresholds and the README's own tables were both raised/refreshed in the same change, per this
+project's established practice of never leaving a number stranded below what the theory now
+actually does.

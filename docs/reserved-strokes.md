@@ -16,4 +16,5 @@ the rest of the word-generation theory is covered:
 - **[Punctuation & commands](punctuation.md)**
 - **[Fingerspelling & misc keys](fingerspelling.md)**
 
-Next: **[briefs](briefs.md)** — the next thing pinned down, before the phonetic rules proper.
+Next: **[briefs](briefs.md)** — where a word's own gold-dictionary outline competes for the stroke
+these don't already claim.

@@ -24,8 +24,9 @@ generated entries.
 2. **[Reserved strokes](reserved-strokes.md)** — commands, punctuation, and fingerspelling are
    pinned before any word is, ahead of even briefs. (The actual content of those strokes is
    chapters 10 and 11, once the word-generation rules below are out of the way.)
-3. **[Briefs](briefs.md)** — the commonest words keep the outlines people already know, pinned
-   before anything generated.
+3. **[Briefs](briefs.md)** — a word can keep the outline people already know from Plover or
+   Lapwing, competing on cost against everything else the rules can derive for it, the same way as
+   any other candidate.
 4. **[Phonetic rules](phonetic-rules.md)** — onset, vowel, coda: how a plain syllable gets its
    stroke when it has no brief.
 5. **[Spelling disambiguation](spelling.md)** — picking between more than one way to write the
@@ -34,8 +35,8 @@ generated entries.
    `under-`, `inter-`.
 7. **[Syllables & folding](syllables.md)** — how an unstressed syllable joins the stroke before
    it, or becomes a continuation stroke of its own.
-8. **[When two words sound the same](collisions.md)** — briefs, then spelling, then the star
-   ladder, in that order.
+8. **[When two words sound the same](collisions.md)** — briefs, spelling, and the star ladder, all
+   settled together by one global optimization instead of a fixed order of passes.
 9. **[How short](brevity.md)** — the brevity steps that shrink a long word's outline, by hand or
    by rule.
 10. **[The full suffix table](suffixes.md)** — every standalone continuation stroke a suffix gets

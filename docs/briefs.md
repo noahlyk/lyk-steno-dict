@@ -2,102 +2,110 @@
 
 [← back to the table of contents](README.md) · [← back to the main README](../README.md)
 
-**Briefs** (`rules/briefs.toml`). The commonest words keep the outlines people already
-know, from Plover by default (`HE`, not `HAOE`) or Lapwing, per word. They are pinned before
-anything else is generated, and nothing generated can take their strokes. A briefed word gets
-exactly that one entry: no rule outline, no short form, no alternate pronunciation reachable
-alongside it. There is only ever one way to stroke the word, faster to learn than picking the
-cheapest of several, and whatever its rule outline or short forms would have claimed is never
-reserved, so a later, less common word is free to take it instead — a brief can shorten a
-completely unrelated word as a side effect, since words are settled once, commonest first,
-with nothing undone to recheck afterwards. A brief is free to be a pure memorized shortcut with
-no phonetic connection to its word at all — that's the point of a brief, and nothing about it
-needs to be "learnable from the rules" the way a generated outline is. What a candidate may
-never do is take only *part* of a key combination these same rules only ever use *together* for
-one sound. Plover's own shortest outline is sometimes exactly that: a fragment of its own
-theory's multi-key sound, not a clean shortcut (`good`'s Plover brief `KPWAOD` keeps the `P W`
-of `TKPW`'s own "g" but drops the `T`, which these rules read back as "k", not "g" — a
-different, wrong sound, not just an unrelated memorized one). That fragment is rejected, and
-two repairs are generated alongside the original candidates to replace it: completing the
-fragment into the whole, correct cluster, or dropping it outright, since a brief is always
-free to skip a sound it isn't attempting at all. Dropping is usually fewer keys, so it's what
-wins when it's available (`good`'s brief is `AOD` — no attempt at its "g" sound at all, rather
-than the seven-key `TKPWAOD` completing it) — but either repair only exists because the word's
-own gold dictionary pointed at that sound to begin with; nothing is invented from nothing.
-Fewest keys then picks among whichever candidates, original or repaired, are left — except that
-a *dropped* candidate (never a raw one) loses this tie-break if it lands exactly on the plain
-outline of a different, commonly-known word that would otherwise have needed it (`fact` used to
-drop its `K` entirely down to `TPAT`, exactly `fat`'s own plain outline, bumping `fat` onto the
-starred `TPA*T` to make room). A rarer word losing its plain outline to a brief outright is this
-whole mechanism's normal, accepted cost — that's what the star ladder is for — so this check
-only looks at words inside the brief window itself (`briefs.count`) that are not themselves
-landing a brief: a word briefed regardless of what it drops, like `a` pinned to `AEU`, was never
-going to need its own plain reading (`A`) at all, so it does not count as a collision.
+**Briefs** (`rules/briefs.toml`). A brief is a word's outline taken from Plover's or Lapwing's own
+gold dictionary instead of derived fresh from lyk's own phonetic rules — `he` as `HE`, not `HAOE`.
+It is free to be a pure memorized shortcut with no phonetic connection to its word at all — that's
+the point of a brief, and nothing about it needs to be "learnable from the rules" the way a
+generated outline is.
 
-That fewest-keys ranking also decides what happens when the very best candidate is already
-someone else's: words settle commonest-first, so a common word's top pick can already belong to
-an even commoner one. Rather than giving up there and falling back to the word's full,
-multi-stroke phonetic outline, every candidate is tried in the same fragment-safe order, and the
-first one nobody else already has wins. This only ever reaches further down its *own* ranked
-list; it never reconsiders a word already settled, so it costs nothing to a commoner word and
-changes nothing about which word wins a shared outline. (`from` used to be the worked example
-here: its own best candidate, bare `R`, was already `are`'s, so it fell through a fragment —
-`PR`, half of the real `F R` cluster `TPR` — to land on the full `TPR` instead. A human later
-looked at that specific word and decided the fragment was fine after all, the same kind of
-judgment call `[word]` exists for — see `rules/briefs.toml`'s own note by `from`, and the
-fragment-vs-dropped-sound rule two paragraphs up for why a fragment is rejected by default.)
+**Every word's primary outline is settled by one global optimization, not a sequence of passes.**
+`generate()` enumerates every legal candidate for every word at once — both gold dictionaries'
+listed outlines, lyk's own plain rules reading, a spelling-told-apart variant for a homophone group,
+every brevity-ladder shortening, and the full star ladder on top of all of that — and then solves
+for the assignment that minimizes the whole dictionary's total cost, weighted by how often each word
+is actually said. A brief, lyk's own rules-derived reading, and a brevity-shortened form all compete
+in the *same* pool for the *same* word; whichever is cheapest for the word, weighed against every
+other word's own stake in the texts it might also want, is what wins. This is new: before, a common
+word's own brief was pinned the moment it was found, with nothing else — not lyk's own plain
+reading, not a later brevity treatment — ever getting a chance to compete against it, which is the
+confirmed reason the dictionary used to track Plover more closely than it needed to for words like
+`takes` (Plover's own listed brief, `TAEUBGS`, used to win uncontested, even though lyk's own
+shorter spelling-variant reading, `TAEBGS` — the same reduction `take`'s own brief, `TAEBG`, already
+happened to use — was never offered as an alternative).
 
-Fewest keys can still leave a flat tie between two of a word's own gold outlines — Plover's own
-list for `best` has both `PW*ES` and `PWEFT`, costing exactly the same 5 keys. The star there
-isn't disambiguating anything this word needs told apart; it's just an artifact of Plover's own
-source, picked over the plain form by nothing more principled than list order. The star-free
-candidate wins a tie like this (`best` lands on `PWEFT`, matching the `[coda]` rule for `-st`
-rather than a coin flip) — a tie-break that only ever fires once every sharper measure above it
-(length, fragment-safety, collision-avoidance, keys) has already come out equal, so it can never
-turn a word away from a genuinely cheaper or safer candidate.
+**A `[word]` literal override is the one exception, and still forces exactly one candidate.** A
+source of `"plover"` or `"lapwing"` in `[word]` only narrows which gold dictionary a word's own
+brief candidates are merged from — the word still competes on cost like anything else. A literal
+outline (`up = "-P"`, `make = "PHAEUBG"`, and the rest `rules/briefs.toml` lists this way) is
+different: a human looked at this specific word and picked its outline by hand, and that decision is
+never reopened to competition against the word's own other candidates, let alone another word's.
+It is resolved first, the same way a reserved outline or a standalone suffix always has been, so
+every other word's own candidate pool already sees it as spoken for from the start. A collision
+between a literal override and something already pinned (a reserved stroke, the suffix table, "I",
+or another override) is still a hard error, worth fixing in `rules/briefs.toml`, never something to
+fall back from silently.
 
-Generation keeps a running count of words whose final outline costs more than their own
-plain-rules reading even though that reading is sitting completely free — a regression guard, not
-an auto-fix, printed by `build` as "words stranded on a worse outline than their own, unclaimed
-plain reading," and backed by `src/quality.rs`'s own test holding that count to a known baseline.
-This can genuinely happen: Plover and Lapwing occasionally mark a one-off candidate with a star, or
-spend an extra key, for a reason of their own theory's that has nothing to do with this one — `wow`'s
-Plover brief used to be `WO*U` here, with the exact same keys and no star, `WOU`, reading this word
-just as well and sitting completely unclaimed; `rules/briefs.toml` now pins it there directly, the
-same fix applied to every other word this count has ever flagged. Fixing a case like that by hand is
-exactly what `[word]` in `rules/briefs.toml` is for — a one-word, looked-at-by-a-human override, the
-same mechanism already used for every other judgment call this file lists.
+**What a candidate may never do is take only *part* of a key combination these same rules only ever
+use *together* for one sound** — and this check now applies to every raw gold-dictionary candidate
+offered at all, not just the ones worth ranking once a word already had a brief, which is new rigor
+over how this used to work. Plover's own shortest outline is sometimes exactly a fragment of its own
+theory's multi-key sound, not a clean shortcut (`good`'s Plover brief `KPWAOD` keeps the `P W` of
+`TKPW`'s own "g" but drops the `T`, which these rules read back as "k", not "g" — a different, wrong
+sound, not just an unrelated memorized one). A raw candidate that fails this check is never offered
+at all; instead, up to two repairs are generated from it and offered as separate candidates of their
+own, since a brief is always free to skip a sound it isn't attempting at all: completing the
+fragment into the whole, correct cluster, or dropping it outright. Dropping is usually fewer keys,
+so it tends to win when both are legal and free — but either repair only exists because the word's
+own gold dictionary pointed at that sound to begin with; nothing is invented from nothing. See
+[`docs/decisions.md`](decisions.md) for what this blanket rigor actually changed once applied to
+the real dictionary: six words (`on`, `from`, `no`, `then`, `day`, `which`) used to carry a literal
+`[word]` override that was itself a hand-picked exploit of the old, narrower version of this check —
+a half-held chord a *literal* override could bypass entirely, since a literal override was never run
+through `matches_real_consonants` at all. Those six overrides are gone; what the dictionary
+generates for them unprompted now is each word's own correct, full phonetic reading, exactly the
+fallback each override's own comment already named as the alternative to its exploit.
 
-A blanket, automatic version of that fix — "use whichever candidate is cheaper, always" — was
-tried and reverted. Two things ruled it out. First, it isn't safe to compare a brief only against
-the word's own plain-rules reading: a different pronunciation of the same written word can parse
-to something shorter with no relation to what the brief is actually for (`a`'s Plover brief
-`AEU` "lost" to a schwa-pronunciation reading of the same word that has nothing to do with the
-stressed vowel `AEU` is written for). Narrowing the comparison to only strip a candidate's *own*
-star and check if that exact text is free avoids that specific trap, but still doesn't avoid the
-second problem: this generator settles every word once, commonest-first, with nothing revisited —
-so changing even one early word's outline reshuffles which outlines are free for every word
-after it, and that reshuffle reaches much further than the word being fixed (confirmed directly:
-even the narrow, star-only version touched outlines for several hundred other words, some of them
-worse off than before, nowhere near the word it was meant to help). That ripple is this whole
-mechanism's normal, accepted cost when a *human* decides a specific word's brief should change —
-it's the same cost adding any new `[word]` entry already has — but it is not something to trigger
-automatically from a blanket rule with no one looking at what it actually moves. The regression
-guard's job is to surface candidates for that human look, not to resolve them on its own.
+**Cost, for ranking candidates against each other, is strokes first, then keys, then physical
+ergonomics as the final tie-break** — the same priority `shortest`/the star ladder always encoded
+informally, now a single explicit function (`candidate_cost`, `src/generate.rs`) applied uniformly
+everywhere a candidate's intrinsic cost matters. Fewer strokes always wins outright; among
+equal-stroke candidates, fewer keys wins; among candidates tied on both, the physically more
+comfortable one wins (see [`src/ergonomics.rs`](../src/ergonomics.rs)). This replaces an older,
+narrower tie-break that preferred a star-free candidate specifically when two of a word's own gold
+outlines tied on every other measure (Plover's own list for `best` has both `PW*ES` and `PWEFT`,
+costing exactly the same 5 keys, with the star there just a list-order artifact of Plover's own
+source) — ergonomics now settles that same kind of tie on the two outlines' actual physical shape
+instead, which can occasionally prefer the starred form if it is genuinely the more comfortable of
+the two to press, not just whichever one happens to carry no star.
 
-The window itself (`count`) is a default for words nobody has looked at individually, not a
-ceiling: a word named explicitly in `[word]` gets a brief regardless of rank, the same way a
-two-key-or-fewer outline already does regardless of rank. That is only done when every one of
-three things holds, checked mechanically rather than by eye: Plover's own outline saves at
-least three whole keys over what the rules generate for the word (a one- or two-key saving this
-far down the frequency list was rejected even where it existed, since it barely moves the
-frequency-weighted cost the rare tier is judged on); that outline's first and last consonants
-are a whole cluster toward the word's real first and last sound, never a fragment of one (the
-same check a plain `plover`/`lapwing` source above already runs through); and claiming it does
-not take a stroke a commoner word already has by the rules (checked by rebuilding — a rarer
-word losing its own outline to a star form, the ordinary cost of adding any brief at all, is
-fine; a commoner one losing its outline because a rarer word's hand-picked brief grabbed it
-first would not be). `rules/briefs.toml` lists each word this has been done for and what it
-saves.
+**Frequency only ever enters at the very end, as the solver's own arbitration weight, never as part
+of a candidate's own cost.** Two words considering the exact same outline agree on how much it
+costs; what decides who actually gets it is how much each word's own total result is worth, weighed
+against every other word's — `setup.count[word]`, how many times the word is actually said in the
+frequency corpus, exactly the same field `build`'s own "weighted by how often it is said" report
+already uses. This makes the solver's objective literally that same headline number: the global
+optimum it finds *is* the average keys per word, weighted by frequency, that `build`/`score` already
+report — not a proxy for it. See [`docs/decisions.md`](decisions.md) for why this has to be the raw
+usage count and not a simpler stand-in like frequency rank: an earlier attempt used `common - rank`,
+which looked "strictly frequency-ordered" but collapsed almost all of its own dynamic range among
+reasonably common words, letting a rare word's merely-somewhat-worse fallback occasionally outbid a
+far commoner word's much better option.
+
+**A word losing a contested outline to a more valuable word is not a failure - it is the whole
+mechanism working**, the direct descendant of the star ladder's old job. Every word keeps its own
+full ladder of fallbacks (the plain reading, a star on the first stroke, a star on the last, then
+one and two extra star strokes) as real, always-present candidates, so losing a contested text never
+means falling all the way back to a word's long multi-stroke phonetic spelling-out when a cheap
+ladder step was sitting right there. Generation also keeps a running count of words whose final
+outline costs more than their own plain-rules reading even though that reading is sitting completely
+free — a regression guard, not an auto-fix, printed by `build` as "words stranded on a worse outline
+than their own, unclaimed plain reading," and backed by `src/quality.rs`'s own test holding that
+count to zero. A true global optimum structurally cannot leave a strictly cheaper, completely free
+outline on the table for a word that could have had it for nothing — swapping to it would always
+lower the total cost — so this count is expected to stay at zero for a real, structural reason now,
+not because every individual case was hand-patched the way it used to be. The guard still runs
+anyway: see [`docs/decisions.md`](decisions.md) for why a confirmed-impossible failure mode is not
+a reason to delete the test that watches for it.
+
+**Where a Hall-violation really is unavoidable — more mutually exclusive words than legal outlines
+to go around, a true multi-way homophone or near-homophone cluster tighter than its own star ladder
+can resolve — the solver sacrifices whichever word has the least to lose, not whichever one a raw
+search happens to leave out.** Every word's own candidate pool includes one more option purely for
+this: a private "no match" fallback, costed far above any of that word's own real candidates but
+still scaled by that word's own frequency weight, so the comparison between two words' own stakes in
+a shared, scarce cluster of outlines stays apples to apples. This case is rare, genuinely
+unavoidable when it happens, and is exactly the kind of unresolved result `build`'s own "words the
+rules could not place" count already reports — not a new failure mode, the same one an unbreakable
+spelling tie already produced before this global solver existed, just reached by a different path.
 
 Next: **[phonetic rules](phonetic-rules.md)** — how a word with no brief gets its stroke instead.

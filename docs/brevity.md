@@ -19,9 +19,14 @@ syllable gives a one-stroke form its left hand (*information* TPH-FGS, *conditio
 *opinion* P*PB), and the glide of *-ion* is not written. A short form never takes an outline that
 any word has by the rules, so the forms a learner can work out stay theirs; when a short form is
 taken, a star on it is tried before giving up, since a star costs a key and a longer form costs a
-stroke. A word with no brief keeps every free short form beside its rule outline, so the
-dictionary holds both ends of the spectrum and the cheapest counts; a word with a brief has
-already settled for its one entry (see **[briefs](briefs.md)**).
+stroke. Every word keeps every short form still free beside its own rule outline once its primary
+is settled, so the dictionary holds both ends of the spectrum and the cheapest one counts toward
+`cheapest` regardless — this now runs as its own pass strictly after every word's primary outline is
+final, which closes a real ordering hazard the old, interleaved version had: a common word's bonus
+short form could squat on text a later, rarer word needed as its own *primary*, simply because the
+common word was processed first. A word pinned to a literal `[word]` override (see
+**[briefs](briefs.md)**) is the one exception — its single entry is a human decision, not reopened
+by a bonus short form any more than by anything else.
 
 `build` prints how many strokes and keys a word takes on average, weighted by how often it is
 said, next to Plover and Lapwing on the same words — see
