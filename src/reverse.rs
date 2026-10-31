@@ -9,7 +9,8 @@
 //! rather than spelled out, unlike keymux's own version.
 
 use crate::analysis::Setup;
-use crate::stroke::{self, Stroke};
+use crate::stroke::{self, Stroke, render_outline};
+use std::collections::HashMap;
 
 /// What a query, as typed, means. See keymux's own `classify` for the identical rule.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -41,10 +42,19 @@ pub struct WordLookup {
     pub lapwing: Option<String>,
 }
 
+/// A word's real, settled outline - the same answer `resolve`, `quote`, and the deployed
+/// dictionary itself would give, not an independently re-derived approximation. Falls back to the
+/// rules' own raw candidates only for a word `dictionary` has nothing for at all (one ranked past
+/// whatever `common` the dictionary was built with, or not a real English word - `ander` has no
+/// dictionary entry of its own, since nobody writes "ander", but the rules can still read it back
+/// once struck; see `Rules::resolve`'s own stem-recognition fallback for that case instead).
 #[must_use]
-pub fn reverse_word(setup: &Setup, word: &str) -> WordLookup {
+pub fn reverse_word(setup: &Setup, dictionary: &HashMap<&str, &[Stroke]>, word: &str) -> WordLookup {
     let lower = word.to_lowercase();
-    let lyk = setup.candidates(&lower).into_iter().next();
+    let lyk = dictionary
+        .get(lower.as_str())
+        .map(|o| render_outline(o))
+        .or_else(|| setup.candidates(&lower).into_iter().next());
     let (plover, lapwing) = setup.gold.shortest(&lower);
     WordLookup {
         word: word.to_string(),
@@ -54,10 +64,12 @@ pub fn reverse_word(setup: &Setup, word: &str) -> WordLookup {
     }
 }
 
-/// `phrase`'s reverse lookup, one entry per word, in the order the phrase gave them.
+/// `phrase`'s reverse lookup, one entry per word, in the order the phrase gave them. `dictionary`
+/// is built once by the caller (see [`reverse_word`]) and shared across every word in the phrase,
+/// not rebuilt per word.
 #[must_use]
-pub fn reverse_phrase(setup: &Setup, phrase: &str) -> Vec<WordLookup> {
-    phrase.split_whitespace().map(|w| reverse_word(setup, w)).collect()
+pub fn reverse_phrase(setup: &Setup, dictionary: &HashMap<&str, &[Stroke]>, phrase: &str) -> Vec<WordLookup> {
+    phrase.split_whitespace().map(|w| reverse_word(setup, dictionary, w)).collect()
 }
 
 #[cfg(test)]

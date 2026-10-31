@@ -71,8 +71,18 @@ enum Command {
         #[arg(long, default_value_t = 60)]
         limit: usize,
     },
-    /// Show how the rules write a word
-    Explain { word: String },
+    /// Show how the rules write a word, next to the real dictionary's own settled answer
+    Explain {
+        word: String,
+        /// Words to cover when building the real dictionary to compare against, most common
+        /// first. Matches `build`'s own default so the comparison reflects what's actually
+        /// deployed.
+        #[arg(long, default_value_t = 100_000)]
+        common: usize,
+        /// Briefs to use instead of the built-in ones
+        #[arg(long)]
+        briefs: Option<PathBuf>,
+    },
     /// Generate the keymux WASM plugin that reads a stroke back the way these rules would,
     /// for whatever a dictionary misses: the single source of this logic, so the deployed
     /// plugin can never drift from the theory it is supposed to mirror
@@ -197,7 +207,16 @@ fn main() -> Result<()> {
             after,
         } => analysis::mismatches(&setup(None)?, *syllables, *limit, *missing, *after),
         Command::Learn { min, limit } => analysis::learn(&setup(None)?, *min, *limit),
-        Command::Explain { word } => analysis::explain(&setup(None)?, word),
+        Command::Explain { word, common, briefs } => {
+            let setup = setup(Some(*common))?;
+            let briefs = match briefs {
+                Some(path) => generate::Briefs::load(path)?,
+                None => generate::Briefs::built_in()?,
+            };
+            let generated = generate::generate(&setup, &briefs, *common)?;
+            let dictionary = generate::cheapest(&generated.entries);
+            analysis::explain(&setup, &dictionary, word)
+        }
         Command::Plugin { out, common, briefs } => {
             let setup = setup(Some(*common))?;
             let briefs = match briefs {
@@ -375,8 +394,14 @@ fn run_lookup(
                 println!("Nothing to look up");
                 return Ok(());
             }
-            let setup = setup(None)?;
-            for found in reverse::reverse_phrase(&setup, &phrase) {
+            let setup = setup(Some(common))?;
+            let briefs = match briefs_path {
+                Some(path) => generate::Briefs::load(path)?,
+                None => generate::Briefs::built_in()?,
+            };
+            let generated = generate::generate(&setup, &briefs, common)?;
+            let dictionary = generate::cheapest(&generated.entries);
+            for found in reverse::reverse_phrase(&setup, &dictionary, &phrase) {
                 println!(
                     "{}\n  lyk      {}\n  plover   {}\n  lapwing  {}",
                     found.word,

@@ -473,8 +473,13 @@ pub fn check_readme(
     );
 }
 
-/// How the rules write a word, syllable by syllable, next to what Plover and Lapwing write.
-pub fn explain(setup: &Setup, word: &str) -> Result<()> {
+/// How the rules write a word, syllable by syllable, next to what Plover and Lapwing write, and
+/// next to the real, settled dictionary's own answer: `ours` below is the rules alone, in
+/// isolation, for seeing how the theory derives a word step by step - it is deliberately not the
+/// deployed outline, which also accounts for briefs, collisions, and the backup-entry pass (see
+/// `deployed`, printed separately, for that; `dictionary` is `generate::cheapest` over a real
+/// `generate::generate` run, built once by the caller).
+pub fn explain(setup: &Setup, dictionary: &HashMap<&str, &[Stroke]>, word: &str) -> Result<()> {
     let word = word.to_lowercase();
     let Some(variants) = setup.pron.get(&word) else {
         println!("{word}: no pronunciation in CMUdict");
@@ -501,6 +506,12 @@ pub fn explain(setup: &Setup, word: &str) -> Result<()> {
     }
     let (plover, lapwing) = setup.gold.shortest(&word);
     println!("ours    {}", setup.candidates(&word).join("  "));
+    println!(
+        "deployed {}",
+        dictionary
+            .get(word.as_str())
+            .map_or_else(|| "(not in the dictionary built here)".to_owned(), |o| render_outline(o))
+    );
     for step in setup.rules.brevity() {
         let forms: Vec<String> = variants
             .iter()
