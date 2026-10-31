@@ -207,12 +207,74 @@ leave them stranded low. `src/quality.rs` adds structural QA guards unrelated to
 words ever sharing a stroke, every sufficiently common pronounceable word actually having an
 outline (the exact kind of check that would have caught the `don't` bug the day it shipped, instead
 of a live user hitting it), the stranded-word count not silently growing past its known baseline
-(10), and no generated word colliding with a reserved command/punctuation/fingerspelling stroke.
-Both share one production-scale dictionary build (`src/dictionary_fixture.rs`, a `LazyLock`) rather
-than paying the few-second `generate()` cost per test - the whole suite (32 tests) runs in ~5
-seconds. **If this corpus or these thresholds get deleted "to make CI faster," every regression
-this session fixed by hand (and ones nobody's found yet) can silently come back with nothing to
-catch them.**
+(0, as of the entry below - it was 10 when this test was first written), and no generated word
+colliding with a reserved command/punctuation/fingerspelling stroke. Both share one production-scale
+dictionary build (`src/dictionary_fixture.rs`, a `LazyLock`) rather than paying the few-second
+`generate()` cost per test - the whole suite (32 tests) runs in ~5 seconds. **If this corpus or
+these thresholds get deleted "to make CI faster," every regression this session fixed by hand (and
+ones nobody's found yet) can silently come back with nothing to catch them.**
+
+**Six top-100 words were paying for a fragment-safety rule they didn't need to (`rules/briefs.toml`:
+`on`, `from`, `no`, `then`, `day`, plus `bloody`/`wow`/`bottle`/`honest`/`flowers`/`gasps`/
+`grunting`/`hiding`/`honey`/`public` from the stranded-word list, and `make` below).** The
+quote-corpus benchmark surfaced these as real, measured losses, not guesses. Root cause for the
+first five: Plover often writes an extremely common monosyllable using only half of this theory's
+own multi-key onset/coda chord (`on`'s Plover brief `OB` is missing the `P` of coda "N"'s real
+`-PB`; `from`'s `PR` is missing the `T` of onset "FR"'s real `TPR`; same pattern for `no`, `then`,
+`day`) - a deliberate professional shorthand, but one `matches_real_consonants` always rejects,
+since it cannot tell "a brief someone meant" from "a fragment that got there by accident" (the exact
+same mechanism investigated for `make` below). Each was checked by hand - confirmed free
+(`cargo run -- resolve -- <outline>`), confirmed nowhere else in `rules/briefs.toml` already -
+before pinning as a literal override. **`one` was checked the same way and deliberately left alone**:
+its own shortest Plover candidate (`WUB`) hits this identical rejection, but `one = "WUPB"` already
+exists as a separate, older, deliberate decision (a homophone fight with `won`) documented in
+`rules/briefs.toml` itself - not an oversight to pile a second fix onto.
+
+**Two contractions (`they're`, `shouldn't`) still cost more than Plover's own brief even after the
+rank-backfill fix above - fixed; seven others (`can't`, `didn't`, `hadn't`, `we've`, `hasn't`,
+`haven't`, `wasn't`) checked and deliberately left alone.** All nine were visible to the generator
+only because of the `CONTRACTIONS` backfill, but several still land far outside `briefs.toml`'s own
+1,500-word window even with a backfilled rank, so `best_brief` never tries Plover's candidate for
+them at all unless named explicitly. `they're` (saves 3 keys: a free `THER`, vs. a three-homophone
+collision fallback `THA*EUR`) and `shouldn't` (saves 3 keys and a stroke-count tie broken on keys:
+`SH-PBT` vs. `SH*UPBTD`) both clear this file's own stated bar for naming a word past the window
+(**"saves at least three whole keys… that outline's first and last consonants are a whole cluster…
+and claiming it does not take a stroke a commoner word already has"** - see the "past this point"
+section) and were added. The other seven save only 1-2 keys each - below that same stated bar - so
+per this file's own already-documented policy they were left alone, not force-included. **If someone
+"fixes" those seven anyway, they are relitigating an existing, written threshold, not filling a
+gap** - raise that, don't just add the entries.
+
+**All ten words `build`'s "stranded on a worse outline" count ever flagged are now fixed
+(`rules/briefs.toml`); the count is 0 and `src/quality.rs`'s baseline was lowered to match.** Every
+one followed the exact same shape: the word's own plain-rules reading was strictly cheaper (fewer
+strokes, or the same strokes with fewer keys) than its deployed outline, and that cheaper reading
+was confirmed completely free before pinning it. Three distinct root causes among the ten, worth
+knowing so the next one is diagnosed faster instead of re-investigated from scratch: (1) a star
+nobody needed (`wow`, `bottle`, `flowers` - Plover's own candidate happened to carry a star for a
+reason specific to Plover's theory, not a real collision here); (2) a word split across two strokes
+when the rules' own single-stroke fold fits fine (`gasps`, `grunting`, `hiding` - all now one
+stroke, matching Lapwing); (3) an onset sound that was never actually attempted getting struck
+anyway (`honest` - the rules' own reading correctly has no "h", since it's silent in this word;
+Plover and Lapwing both write an "h" nobody says). `honey` and `public` were smaller, unexplained
+key differences, not fitting any of the three patterns above - just confirmed cheaper and free. **If
+this count goes above 0 again, something in collision resolution regressed - it is not something to
+raise the baseline to tolerate.**
+
+**`make = AEUBG` investigated and fixed - confirmed a genuine defect, not the 113-word pattern it
+looked like at first (`rules/briefs.toml`: `make = "PHAEUBG"`).** One of Plover's own gold entries
+writes "make" with a bare `P` instead of the real `M` chord `PH`; `matches_real_consonants` correctly
+flags the bare `P` as holding only half a real chord, and its "repair" deletes it entirely rather
+than completing it, landing on `AEUBG` - a vowel-only outline with zero trace of the word's actual
+first sound. The earlier investigation found 113 *other* words relying on this exact same
+fragment-drop mechanism deliberately (`the`→`-T`, `not`→`OT`, `never`→`EFR`, and so on) and
+correctly concluded the shared heuristic itself must not change. `make` is simply one of the rare
+cases on that list where the dropped result lands on something confusing enough (a word with no
+trace of its own first sound at all, rather than a short known brief) to be worth a one-off
+`[word]` override - exactly the per-word escape hatch that finding already recommended, now applied.
+**This does not reopen the question of changing `best_brief`/`drop_fragments` themselves** - that
+was a closed, investigated decision; this is just one of the data points it already anticipated
+getting hand-fixed individually.
 
 ## Two rules that override any of the above
 

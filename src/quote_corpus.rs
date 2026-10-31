@@ -253,20 +253,20 @@ fn score(passages: &[&str]) -> Stats {
 /// same commit, not leave them stranded below what the theory now actually does.
 mod threshold {
     /// Share of the hundred-odd passages whose total keys lyk beats outright.
-    pub const PASSAGE_WIN_PCT_PLOVER: f64 = 55.0;
-    pub const PASSAGE_WIN_PCT_LAPWING: f64 = 70.0;
+    pub const PASSAGE_WIN_PCT_PLOVER: f64 = 58.0;
+    pub const PASSAGE_WIN_PCT_LAPWING: f64 = 73.0;
     /// Share of individual words where lyk strictly beats the other theory on keys.
-    pub const WORD_FEWER_KEYS_PCT_PLOVER: f64 = 15.0;
-    pub const WORD_FEWER_KEYS_PCT_LAPWING: f64 = 30.0;
+    pub const WORD_FEWER_KEYS_PCT_PLOVER: f64 = 17.0;
+    pub const WORD_FEWER_KEYS_PCT_LAPWING: f64 = 32.0;
     /// Share of individual words where lyk strictly *loses* on keys - capped, so a change that
     /// quietly makes more words worse doesn't hide behind an unrelated set of words getting better.
-    pub const WORD_MORE_KEYS_PCT_PLOVER_MAX: f64 = 12.0;
-    pub const WORD_MORE_KEYS_PCT_LAPWING_MAX: f64 = 8.0;
+    pub const WORD_MORE_KEYS_PCT_PLOVER_MAX: f64 = 10.0;
+    pub const WORD_MORE_KEYS_PCT_LAPWING_MAX: f64 = 6.5;
     /// How much cheaper lyk's aggregate key total must be, as a percentage of the other theory's
     /// own total - the single hardest number to fake, since it is not swayed by lots of tiny common
     /// words tying (`a`, `the`, `is` cost the same everywhere) the way a per-word percentage is.
-    pub const AGGREGATE_SAVINGS_PCT_PLOVER: f64 = 0.5;
-    pub const AGGREGATE_SAVINGS_PCT_LAPWING: f64 = 6.5;
+    pub const AGGREGATE_SAVINGS_PCT_PLOVER: f64 = 1.0;
+    pub const AGGREGATE_SAVINGS_PCT_LAPWING: f64 = 7.5;
 }
 
 /// Prints the full breakdown (`cargo test --release quote_corpus -- --nocapture` to see it) and

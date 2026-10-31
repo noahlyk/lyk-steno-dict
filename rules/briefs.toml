@@ -66,6 +66,29 @@ working = "WORBG/+-G"
 # other period strokes are left.)
 am = "-PL"
 
+# Plover often writes an extremely common monosyllable with only half of this theory's own
+# two-or-three-key onset or coda chord (coda "N" is `-PB` here, so Plover's bare "-B" is missing
+# the "P"; onset "FR" is `TPR`, so Plover's bare "PR" is missing the "T"; and so on) - a deliberate
+# professional shorthand, not a typo, but one `best_brief`'s own fragment-safety check
+# (`matches_real_consonants`, the same rule that caught `make` writing a bare "P" for "M" by
+# accident - see docs/decisions.md) always rejects, since by design it cannot tell "half a chord
+# someone meant as a brief" from "half a chord that got there by mistake": the two look identical
+# on the stroke. Each of these five was checked by hand, confirmed free in the real dictionary
+# (`cargo run -- resolve -- <outline>`), and found nowhere else in this file first. Literal
+# overrides, not `"plover"`, since the whole point is bypassing that check for an outline a human
+# already looked at - the same reasoning `up`/`all`/`go` above already use.
+on = "OB"      # coda "N" (`-PB`) missing its "P": the rules' own full reading was "OPB"
+from = "PR"    # onset "FR" (`TPR`) missing its "T": the rules' own full reading was "TPROPL"
+no = "PHO"     # onset "N" (`TPH`) missing its "T": the rules' own full reading was "TPHOE"
+then = "THEB"  # coda "N" (`-PB`) missing its "P": the rules' own full reading was "THEPB"
+day = "TAEU"   # onset "D" (`TK`) missing its "K": reclaimed from "tae" (rank ~6,800, a far rarer
+               # word only holding it by default - it falls back to its own plain reading instead)
+
+# "one" was checked the same way and left alone: Plover's own shortest candidate for it ("WUB")
+# hits this exact fragment rejection too, but seven lines up `one = "WUPB"` already exists as a
+# separate, deliberate decision (a homophone fight with "won" for the fully-formed outline) - not
+# an oversight to pile onto here.
+
 # Past this point every word above is ranked in the top 1,500 by frequency, so it would get a
 # brief from `count` alone; naming a word here at all is what pulls it into the window from
 # further out, past wherever `count` stops. That is only done when all of the following hold,
@@ -97,6 +120,15 @@ including = "plover"      # KHRUG vs. EUPB/KHRAOUGD
 include = "plover"        # KHRU vs. EUPB/KHRAOUD
 understanding = "plover"  # URBGD vs. URPBD/STAPBGD
 imagination = "plover"    # PHAEGS vs. EUPL/APBLG/TPHAEUGS
+
+# These two contractions only entered the dictionary at all once `CONTRACTIONS` in `src/analysis.rs`
+# backfilled their frequency rank (see docs/decisions.md) - both land far outside this file's own
+# 1,500 window even after that, so without naming them here they settle for whatever the rules or a
+# same-sound collision happens to leave them, never reaching Plover's own shorter brief. The quote-
+# corpus benchmark (`src/quote_corpus.rs`) is what surfaced both as real losses, not a guess:
+"they're" = "plover"   # THER (4 keys) vs. the three-homophone collision fallback THA*EUR (7) -
+                        # "there"/"their" already each have their own outline, THER itself is free
+"shouldn't" = "plover"  # SH-PBT (5 keys, 1 stroke) vs. a star-collision fallback SH*UPBTD (8)
 
 # A second pass over `build`'s own "words that cost the most extra keys over plover" report:
 # every word below was outside the 1,500 window with a real, non-fragment gap of three keys or
@@ -190,3 +222,28 @@ describe = "plover"       # 5 keys, SKREU
 # syllable's own complete onset or coda no longer counts as a fragment of the one being checked, so
 # `plover` above now reaches the correct, whole-cluster outline on its own instead of needing the
 # literal pin this used to be.
+
+# Every word `build`'s own "stranded on a worse outline than their own, unclaimed plain reading"
+# count flagged (see `src/quality.rs`'s regression guard and docs/decisions.md), fixed by hand -
+# confirmed free with `cargo run -- resolve -- <outline>` before pinning, same as every entry
+# above. Lower `KNOWN_BASELINE` in `src/quality.rs` to 0 in the same commit as this.
+bloody = "PWHROD/EU"    # the rules' own reading, three keys fewer than the deployed `PWHRAO/TKEU`
+wow = "WOU"             # same keys as Plover's own `WO*U`, star dropped: nothing else wants it
+bottle = "PWOLT"        # same keys as Plover's own `PWO*LT`, star dropped: nothing else wants it
+honest = "OPBS"         # the rules' own reading, no "h" (it's silent in "honest") - Plover and
+                         # Lapwing both write it with an "h" that was never attempted as a sound
+flowers = "TPHROURZ"    # the rules' own reading, one key and one star fewer than `TPHRO*URS`
+gasps = "TKPWAFPS"      # one stroke, not two - the rules' own reading fits where the deployed
+                         # `TKPWAS/-PS` split in half for no reason
+grunting = "TKPWRUPBGT" # one stroke, not two - same gap as `gasps`, matches Lapwing's own
+hiding = "HAOEUGD"      # one stroke, not two - same gap again, `HAOEUD/-G` split for nothing
+honey = "HOPB/EU"       # second stroke drops to the rules' own plain vowel instead of `KWREU`
+public = "PUBLG"        # the rules' own reading, one key fewer than the deployed `PHREUB`
+
+# `make` investigated and confirmed *not* part of the pattern above - see docs/decisions.md's
+# `make`/`AEUBG` entry. One of Plover's own gold entries writes "make" with a bare `P` instead of
+# the real `M` chord `PH`; the fragment-safety check correctly flags the bare `P` and "repairs" it
+# by deleting it outright rather than completing it, landing on `AEUBG` - a vowel-only outline with
+# no trace of the word's real first sound at all. Pinned to the rules' own correct phonetic
+# reading instead, which also matches Lapwing exactly.
+make = "PHAEUBG"

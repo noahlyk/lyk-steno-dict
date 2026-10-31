@@ -62,18 +62,17 @@ fn every_sufficiently_common_pronounceable_word_has_a_real_outline() {
 }
 
 /// The count of words settled on a worse outline than their own, unclaimed plain reading (`build`
-/// prints this list; see `docs/decisions.md`'s `make`/brief-collision entry) is a known, inspected
-/// baseline today, fixed one `[word]` override at a time by hand - not something that should ever
-/// silently grow. If this fails because the count went *up*, something in collision resolution
-/// regressed. If it fails because the count went *down*, someone fixed one - lower this constant
-/// in the same commit as the fix, it is not something to work around.
+/// prints this list; see `docs/decisions.md`'s stranded-word entry) was fixed down to zero, one
+/// `[word]` override at a time by hand - not something that should ever silently grow back. If
+/// this fails, something in collision resolution regressed. A future regression that can't be
+/// fixed immediately gets its own named, reasoned exception here (a nonzero baseline *with* a
+/// comment pointing at an open issue) - not a quiet bump of a bare constant.
 #[test]
 fn stranded_word_count_has_not_grown_past_its_known_baseline() {
-    const KNOWN_BASELINE: usize = 10;
     let stranded = &dictionary_fixture::generated().stranded;
     assert!(
-        stranded.len() <= KNOWN_BASELINE,
-        "stranded-word count grew from {KNOWN_BASELINE} to {}: {:?}",
+        stranded.is_empty(),
+        "stranded-word count grew from 0 to {}: {:?}",
         stranded.len(),
         stranded
     );

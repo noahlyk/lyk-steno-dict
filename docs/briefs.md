@@ -36,13 +36,16 @@ going to need its own plain reading (`A`) at all, so it does not count as a coll
 
 That fewest-keys ranking also decides what happens when the very best candidate is already
 someone else's: words settle commonest-first, so a common word's top pick can already belong to
-an even commoner one (`from`'s own best candidate, bare `R`, is already `are`'s). Rather than
-giving up there and falling back to the word's full, multi-stroke phonetic outline, every
-candidate is tried in the same fragment-safe order, and the first one nobody else already has
-wins (`from` falls through `R` to land on `TPR` instead — three keys, not the six its own rules
-outline would have cost). This only ever reaches further down its *own* ranked list; it never
-reconsiders a word already settled, so it costs nothing to a commoner word and changes nothing
-about which word wins a shared outline.
+an even commoner one. Rather than giving up there and falling back to the word's full,
+multi-stroke phonetic outline, every candidate is tried in the same fragment-safe order, and the
+first one nobody else already has wins. This only ever reaches further down its *own* ranked
+list; it never reconsiders a word already settled, so it costs nothing to a commoner word and
+changes nothing about which word wins a shared outline. (`from` used to be the worked example
+here: its own best candidate, bare `R`, was already `are`'s, so it fell through a fragment —
+`PR`, half of the real `F R` cluster `TPR` — to land on the full `TPR` instead. A human later
+looked at that specific word and decided the fragment was fine after all, the same kind of
+judgment call `[word]` exists for — see `rules/briefs.toml`'s own note by `from`, and the
+fragment-vs-dropped-sound rule two paragraphs up for why a fragment is rejected by default.)
 
 Fewest keys can still leave a flat tie between two of a word's own gold outlines — Plover's own
 list for `best` has both `PW*ES` and `PWEFT`, costing exactly the same 5 keys. The star there
@@ -56,12 +59,14 @@ turn a word away from a genuinely cheaper or safer candidate.
 Generation keeps a running count of words whose final outline costs more than their own
 plain-rules reading even though that reading is sitting completely free — a regression guard, not
 an auto-fix, printed by `build` as "words stranded on a worse outline than their own, unclaimed
-plain reading." This can genuinely happen: Plover and Lapwing occasionally mark a one-off
-candidate with a star, or spend an extra key, for a reason of their own theory's that has nothing
-to do with this one (`wow`'s Plover brief is `WO*U`; the exact same keys with no star, `WOU`, read
-this word just as well and cost one key less, and sat completely unclaimed). Fixing a case like
-that by hand is exactly what `[word]` in `rules/briefs.toml` is for — a one-word, looked-at-by-a-
-human override, the same mechanism already used for every other judgment call this file lists.
+plain reading," and backed by `src/quality.rs`'s own test holding that count to a known baseline.
+This can genuinely happen: Plover and Lapwing occasionally mark a one-off candidate with a star, or
+spend an extra key, for a reason of their own theory's that has nothing to do with this one — `wow`'s
+Plover brief used to be `WO*U` here, with the exact same keys and no star, `WOU`, reading this word
+just as well and sitting completely unclaimed; `rules/briefs.toml` now pins it there directly, the
+same fix applied to every other word this count has ever flagged. Fixing a case like that by hand is
+exactly what `[word]` in `rules/briefs.toml` is for — a one-word, looked-at-by-a-human override, the
+same mechanism already used for every other judgment call this file lists.
 
 A blanket, automatic version of that fix — "use whichever candidate is cheaper, always" — was
 tried and reverted. Two things ruled it out. First, it isn't safe to compare a brief only against
