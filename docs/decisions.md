@@ -289,6 +289,23 @@ nothing else moved. **If `which`'s override is ever removed, don't "fix" it by p
 Plover's `WEU`** - that candidate is the one that fails the fragment check in the first place; the
 literal `"KH"` is what makes this work.
 
+**A continuation's stem drops its own silent `e` before a vowel-initial suffix
+(`Rules::resolve`/`drop_silent_e`, mirrored in `generate_plugin`'s template).** `SR/+-G` ("have"
+plus the standalone "-ing" suffix) read back as "haveing" - the stem's real text ("have", found by
+the earlier stem-recognition fix) concatenated with the suffix's real text ("ing") with nothing in
+between to apply basic English spelling. Confirmed this wasn't an isolated case: `AOUS/+-G` ("use"
+plus "-ing") had the exact same problem, reading "useing" instead of "using" - anything with a
+silent trailing `e` before a vowel-initial continuation was affected, not just "have". Fixed by
+computing the very next piece's text *before* committing the stem, so a trailing silent `e` can
+drop when it's genuinely silent (preceded by a consonant) and what follows starts with a vowel -
+`entire` + `ly` correctly keeps its `e` (consonant-initial suffix), `agree` + `ing` correctly keeps
+it too (the letter before the `e` is already a vowel, so it was never silent). Mirrored into the
+generated plugin's own template and verified by compiling that generated source standalone and
+calling its `resolve` directly - the two must never drift, since the deployed plugin is what a real
+keystroke actually reaches. **Known, accepted gap**: "dye"/"singe" keep their `e` before "-ing" in
+real English specifically to stay visually distinct from "die"/"sing" - not special-cased, since
+these are rare exceptions to an otherwise reliable general rule, not a sign the rule is wrong.
+
 ## Two rules that override any of the above
 
 These were stated repeatedly and are not up for silent renegotiation by a future change:

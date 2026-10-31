@@ -39,6 +39,17 @@ one stroke: a single stroke that matches a placed word would already have been a
 dictionary hit, never reaching `resolve` at all. It's scoped to a single-stroke stem for now — a
 multi-stroke placed word as the stem of an unmatched run is a known, not-yet-covered extension.
 
+**A stem's own real text still isn't enough on its own — English spelling isn't just
+concatenation.** `SR` is "have"'s own brief; `SR` plus `+-G` ("-ing") used to read "haveing"
+(the stem's literal text, "ing" stuck straight onto the end) instead of "having", because nothing
+dropped the silent `e` the way a person spelling the word by hand would. `resolve` now checks the
+very next piece's first letter before committing the stem: a trailing silent `e` drops when what
+follows starts with a vowel (`have` + `ing` → `having`, `use` + `ing` → `using`), and stays when it
+doesn't (`entire` + `ly` → `entirely`) or when the `e` isn't silent to begin with (`agree` + `ing`
+stays `agreeing`, since the letter before the `e` is already a vowel). A few genuine English
+exceptions aren't covered — "dye" and "singe" keep their `e` before `-ing` specifically to stay
+visually distinct from "die" and "sing", which this rule doesn't know to special-case.
+
 **A true miss** — where the rules give up outright and the engine would fall back to a raw echo
 of the keys — is only a stroke with nothing left once the star and join keys are set aside: no
 onset, no vowel, no coda, because the star and join alone carry no sound.

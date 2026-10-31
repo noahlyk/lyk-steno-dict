@@ -1373,40 +1373,62 @@ impl Rules {
             && let Some(&first) = outline.first()
             && let Some(stem) = stems.and_then(|stems| stems.get(&first))
         {
-            text.push_str(stem);
-            1
+            // The stem's own trailing silent `e` (if any) needs to see the very next piece's
+            // first letter before it can be written at all (`have` + `ing` -> `having`, not
+            // `haveing`) — so that piece is computed here, before the stem is pushed, rather than
+            // by the general loop below.
+            if let Some(&next) = outline.get(1) {
+                let (next_text, needs_space) = self.piece_text(next, true)?;
+                let starts_with_vowel = next_text.starts_with(['a', 'e', 'i', 'o', 'u']);
+                text.push_str(drop_silent_e(stem, starts_with_vowel));
+                if needs_space {
+                    text.push(' ');
+                }
+                text.push_str(&next_text);
+                2
+            } else {
+                text.push_str(stem);
+                1
+            }
         } else {
             0
         };
         for (i, &stroke) in outline.iter().enumerate().skip(skip) {
-            // A continuation stroke (never the first, unless the stem lookup above already
-            // consumed it) that's exactly one of `rules/suffixes.toml`'s own chords reads as that
-            // suffix's real spelling ("ed"), not the generic phonetic guess at its bare
-            // consonants ("d") every other miss gets — the same reading it would have if it were
-            // the dictionary's own standalone entry for this suffix, now unconditional instead of
-            // only when some specific composed outline happens to already be a literal
-            // dictionary entry.
-            if i > 0 && stroke.0 & Stroke::JOIN != 0 && let Some(suffix) = self.suffixes.get(&stroke) {
-                text.push_str(suffix);
-                continue;
-            }
-            let resolved = self.resolve_stroke(stroke)?;
-            if !resolved.join && !text.is_empty() {
+            let (piece, needs_space) = self.piece_text(stroke, i > 0)?;
+            if needs_space && !text.is_empty() {
                 text.push(' ');
             }
-            for sound in resolved
-                .onset
-                .iter()
-                .chain(resolved.vowel.iter())
-                .chain(resolved.coda.iter())
-            {
-                text.push_str(default_spelling(sound));
-            }
-            if resolved.marker {
-                text.push('*');
-            }
+            text.push_str(&piece);
         }
         Some(text)
+    }
+
+    /// A single stroke's own text within a continuation run: a `rules/suffixes.toml` match if
+    /// `is_continuation` and the stroke is exactly one of those chords ("ed", not a generic
+    /// phonetic guess at bare consonants, "d") — the same reading it would have as the
+    /// dictionary's own standalone entry for this suffix, now unconditional instead of only when
+    /// some specific composed outline happens to already be a literal dictionary entry — the
+    /// plain phonetic read-back otherwise. The second item says whether a space belongs before
+    /// this piece when it is not the very first thing assembled: never, for a suffix match or any
+    /// other joined stroke.
+    fn piece_text(&self, stroke: Stroke, is_continuation: bool) -> Option<(String, bool)> {
+        if is_continuation && stroke.0 & Stroke::JOIN != 0 && let Some(suffix) = self.suffixes.get(&stroke) {
+            return Some((suffix.clone(), false));
+        }
+        let resolved = self.resolve_stroke(stroke)?;
+        let mut text = String::new();
+        for sound in resolved
+            .onset
+            .iter()
+            .chain(resolved.vowel.iter())
+            .chain(resolved.coda.iter())
+        {
+            text.push_str(default_spelling(sound));
+        }
+        if resolved.marker {
+            text.push('*');
+        }
+        Some((text, !resolved.join))
     }
 
     /// The source of a keymux WASM plugin that reads a stroke back exactly the way
@@ -1518,6 +1540,21 @@ fn plain(sound: &str) -> &str {{
         .split('.')
         .next()
         .unwrap_or(sound)
+}}
+
+/// English's own rule for a stem ending in a silent `e`: drop it before a suffix that starts with
+/// a vowel letter. Mirrors `rules.rs`'s `drop_silent_e`.
+fn drop_silent_e(stem: &str, next_starts_with_vowel: bool) -> &str {{
+    let bytes = stem.as_bytes();
+    if next_starts_with_vowel
+        && bytes.len() > 1
+        && bytes[bytes.len() - 1] == b'e'
+        && !matches!(bytes[bytes.len() - 2], b'a' | b'e' | b'i' | b'o' | b'u')
+    {{
+        &stem[..stem.len() - 1]
+    }} else {{
+        stem
+    }}
 }}
 
 /// A plain, readable spelling for a sound: not real orthography, just enough that a resolved
@@ -1669,6 +1706,28 @@ fn resolve_spelling(outline: &str) -> Option<String> {{
     Some(text)
 }}
 
+/// A single stroke's own text within a continuation run: a `rules/suffixes.toml` match if
+/// `is_continuation` and the stroke is exactly one of those chords, the plain phonetic read-back
+/// otherwise. The second item says whether a space belongs before this piece when it is not the
+/// very first thing assembled: never, for a suffix match or any other joined stroke. Mirrors
+/// `rules.rs`'s `Rules::piece_text`.
+fn piece_text(bits: u32, is_continuation: bool) -> Option<(String, bool)> {{
+    if is_continuation && bits & JOIN != 0 {{
+        if let Some(&(_, suffix)) = SUFFIXES.iter().find(|&&(b, _)| b == bits) {{
+            return Some((suffix.to_string(), false));
+        }}
+    }}
+    let (onset, vowel, coda, marker, join) = resolve_stroke(bits)?;
+    let mut text = String::new();
+    for sound in onset.iter().chain(vowel.iter()).chain(coda.iter()) {{
+        text.push_str(default_spelling(sound));
+    }}
+    if marker {{
+        text.push('*');
+    }}
+    Some((text, !join))
+}}
+
 /// This plugin's actual job: a stroke outline, in Plover notation (one stroke, or several
 /// separated by `/`), read back the way the theory itself would read it.
 fn resolve(outline: &str) -> Option<String> {{
@@ -1683,33 +1742,33 @@ fn resolve(outline: &str) -> Option<String> {{
     // `Rules::resolve`.
     let mut skip = 0;
     if parts.len() > 1 {{
-        if let Some(&(_, word)) = STEMS.iter().find(|&&(b, _)| b == first_bits) {{
-            text.push_str(word);
-            skip = 1;
+        if let Some(&(_, stem)) = STEMS.iter().find(|&&(b, _)| b == first_bits) {{
+            // The stem's own trailing silent `e` (if any) needs to see the very next piece's
+            // first letter before it can be written at all (`have` + `ing` -> `having`, not
+            // `haveing`): mirrors `Rules::resolve`.
+            if let Some(part) = parts.get(1) {{
+                let next_bits = parse_stroke(part)?;
+                let (next_text, needs_space) = piece_text(next_bits, true)?;
+                let starts_with_vowel = next_text.starts_with(['a', 'e', 'i', 'o', 'u']);
+                text.push_str(drop_silent_e(stem, starts_with_vowel));
+                if needs_space {{
+                    text.push(' ');
+                }}
+                text.push_str(&next_text);
+                skip = 2;
+            }} else {{
+                text.push_str(stem);
+                skip = 1;
+            }}
         }}
     }}
     for (i, part) in parts.iter().enumerate().skip(skip) {{
         let bits = parse_stroke(part)?;
-        // A continuation stroke (never the first, unless the stem lookup above already consumed
-        // it) that's exactly one of `rules/suffixes.toml`'s own chords reads as that suffix's
-        // real spelling, not a generic phonetic guess at its bare consonants: mirrors
-        // `Rules::resolve`.
-        if i > 0 && bits & JOIN != 0 {{
-            if let Some(&(_, suffix)) = SUFFIXES.iter().find(|&&(b, _)| b == bits) {{
-                text.push_str(suffix);
-                continue;
-            }}
-        }}
-        let (onset, vowel, coda, marker, join) = resolve_stroke(bits)?;
-        if !join && !text.is_empty() {{
+        let (piece, needs_space) = piece_text(bits, i > 0)?;
+        if needs_space && !text.is_empty() {{
             text.push(' ');
         }}
-        for sound in onset.iter().chain(vowel.iter()).chain(coda.iter()) {{
-            text.push_str(default_spelling(sound));
-        }}
-        if marker {{
-            text.push('*');
-        }}
+        text.push_str(&piece);
     }}
     Some(text)
 }}
@@ -1767,6 +1826,26 @@ pub struct Resolved {
     /// A star down that no coda or vowel combination claims: a disambiguation flag, not a sound
     pub marker: bool,
     pub join: bool,
+}
+
+/// English's own rule for a stem ending in a silent `e`: drop it before a suffix that starts with
+/// a vowel letter (`have` + `ing` -> `having`, not `haveing`) so a continuation after a known stem
+/// (see [`Rules::resolve`]) reads as real spelling, not naive concatenation. Skipped when the `e`
+/// isn't silent - already preceded by another vowel (`agree` + `ing` stays `agreeing`; `argue` +
+/// `ing` still drops only the one trailing `e`, `arguing`). Known, unhandled exceptions: English
+/// keeps the `e` in a few cases to stay visually distinct from another word (`dye` + `ing` =
+/// `dyeing`, not `dying`; `singe` + `ing` = `singeing`, not `singing`) - not special-cased here.
+fn drop_silent_e(stem: &str, next_starts_with_vowel: bool) -> &str {
+    let bytes = stem.as_bytes();
+    if next_starts_with_vowel
+        && bytes.len() > 1
+        && bytes[bytes.len() - 1] == b'e'
+        && !matches!(bytes[bytes.len() - 2], b'a' | b'e' | b'i' | b'o' | b'u')
+    {
+        &stem[..stem.len() - 1]
+    } else {
+        stem
+    }
 }
 
 /// A plain, readable spelling for a sound: not real orthography (that needs the word's own
@@ -1960,6 +2039,27 @@ mod tests {
         // the stem table - a real dictionary would have already answered it directly, so this
         // case should never actually reach `resolve` with `outline.len() == 1`.
         assert_eq!(read("SKP"), Some("sp".to_owned()));
+    }
+
+    #[test]
+    fn a_stems_own_silent_e_drops_before_a_vowel_initial_continuation() {
+        let rules = Rules::built_in().unwrap();
+        let sr = parse_outline("SR").unwrap()[0];
+        let mut stems = HashMap::new();
+        let read = |rules: &Rules, stems: &HashMap<Stroke, String>, text: &str| {
+            rules.resolve(&parse_outline(text).unwrap(), Some(stems))
+        };
+        // "have" + the standalone "-ing" suffix used to concatenate literally ("haveing"); English
+        // drops a stem's own trailing silent `e` before a vowel-initial suffix.
+        stems.insert(sr, "have".to_owned());
+        assert_eq!(read(&rules, &stems, "SR/+-G"), Some("having".to_owned()));
+        // A consonant-initial suffix never drops it ("entirely", not "entirly" - not a real stem
+        // here, but the same mechanism, exercised through a made-up one).
+        stems.insert(sr, "entire".to_owned());
+        assert_eq!(read(&rules, &stems, "SR/+-L"), Some("entirely".to_owned()));
+        // An `e` that wasn't silent to begin with (preceded by another vowel) never drops either.
+        stems.insert(sr, "agree".to_owned());
+        assert_eq!(read(&rules, &stems, "SR/+-G"), Some("agreeing".to_owned()));
     }
 
     #[test]
