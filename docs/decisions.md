@@ -110,22 +110,42 @@ matching every CLI default to 100k. **If these defaults drift apart again, every
 `quote`/`resolve`/`lookup` run becomes a false demo of lyk's own quality**, understating exactly
 the terseness comparisons the whole project is judged by.
 
-## In progress, not yet landed as of this entry
+**The "stranded outline" investigation turned out smaller than it looked (`ae725e4`).** `take`
+sitting on a starred `TA*EUBG` while the plain `TAEUBG` sat unclaimed was the motivating report -
+and it was a false alarm. `TA*EUBG` isn't `take`'s own primary at all: it's a `Backup` entry
+(`T` + the rare word `ake`'s own starred outline, itself a genuine, permanent collision against
+`make`), and `generate::cheapest` already correctly picks `take`'s real primary, the clean 5-key
+brief `TAEBG` - the confusion was entirely the next entry's bug (`lookup`/`explain` showing the
+wrong thing). A real, much smaller issue *did* turn up while checking: ten words (`wow`, `honest`,
+`bottle`, `public`, `hiding`, `gasps`, `flowers`, `grunting`, `honey`, `bloody`) sit on a brief
+that costs more than their own plain-rules reading, which is sitting completely free. An automatic
+fix was tried - first a blanket "use whichever is cheaper," then a narrower version that only
+strips a candidate's own gratuitous star - and **both were reverted**. The blanket version
+relitigated briefs as foundational as `a`'s own `AEU` against an unrelated pronunciation's shorter
+reading; even the narrow, star-only version rippled into several hundred other words' outlines,
+some worse off, because this generator settles every word once, commonest-first, with nothing
+revisited - changing even one early word reshuffles everything after it. That ripple is an
+accepted cost for a human adding a `[word]` override, not for code deciding on its own. What
+shipped instead: a standing count, printed by `build` as "words stranded on a worse outline than
+their own, unclaimed plain reading," surfacing exactly these ten for a maintainer to fix by hand
+with `[word]` the normal way. **Don't revive the automatic version** without first finding a
+comparison that can't reach past the specific word it's meant to help - "cheaper" alone isn't it.
 
-- **A "reclaim" pass for stranded outlines** (`take` sits on a starred `TA*EUBG` while its own
-  natural, unstarred `TAEUBG` is completely unclaimed — the generator is a single greedy pass, so
-  a word that loses an early collision to a winner who *later* relocates elsewhere is never
-  revisited, even once its first-choice outline is sitting free). Planned fix: a final pass after
-  all generation settles that reclaims any word's cheaper, now-free original candidate, run to a
-  fixed point, plus a permanent check that flags any word not sitting on its own cheapest
-  currently-free outline.
-- **`lookup`/`explain` reading the real dictionary.** Both currently call the raw phonetic
-  candidate computation directly (`setup.candidates(...)`), bypassing `generate()`'s full
-  collision resolution, briefs, and backup entries entirely — `lookup quitters` shows a garbled
-  2-stroke guess even though the real, deployed dictionary has the clean `KWEURTZ`. Planned fix:
-  route both through `generate::generate` + `generate::cheapest`, same as `quote` already does,
-  falling back to the raw candidate only for words that never made it into the generated
-  dictionary at all.
+**`lookup`/`explain` now read the real dictionary (`62a2dae`).** Both called the raw phonetic
+candidate computation directly (`setup.candidates(...)`), bypassing `generate()`'s full collision
+resolution, briefs, and backup entries entirely, and never marking continuation strokes with the
+join key either - `lookup quitters` showed a garbled, unjoined `KWEUT/-RZ` even though the real,
+deployed dictionary has the clean, single-stroke `KWEURTZ`. This is also what made the `take`
+investigation above take as long as it did: the tool being used to check the generator's output
+was itself the thing lying. Fixed by routing `lookup`'s word/phrase path through
+`generate::generate` + `generate::cheapest`, same as `quote`/`resolve` already do, falling back to
+the raw candidate only for a word that never made it into the generated dictionary at all.
+`explain` keeps its existing `ours` line exactly as it was on purpose - it's a deliberately
+rules-only view, for seeing how the theory derives a word step by step - and gains a new `deployed`
+line next to it showing the real answer, rather than conflating the two. **If `ours` and
+`deployed` ever get merged back into one line, this exact confusion comes back**: a rules-only
+derivation is not the same question as "what does this word actually stroke as," and both answers
+are worth keeping visible, not just one.
 
 ## Two rules that override any of the above
 
