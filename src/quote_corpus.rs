@@ -257,31 +257,33 @@ mod threshold {
     /// Raised across the board here (`generate()`'s candidate-enumeration-and-solver rewrite -
     /// see `docs/decisions.md`): a real, measured improvement, same practice as every other
     /// threshold change this project has made - raise the number in the same commit as the win,
-    /// not leave it stranded low. `WORD_MORE_KEYS_PCT_PLOVER_MAX` is the one exception, raised
-    /// instead of lowered, because it is a real, understood, and accepted *trade* this rewrite
-    /// makes on purpose (see its own doc below) - not an improvement to bank.
-    pub const PASSAGE_WIN_PCT_PLOVER: f64 = 66.0;
-    pub const PASSAGE_WIN_PCT_LAPWING: f64 = 84.0;
+    /// not leave it stranded low. Even `WORD_MORE_KEYS_PCT_PLOVER_MAX` (the one number this rewrite
+    /// was expected to cost something on, since the solver trades a handful of individual words for
+    /// a better aggregate - see its own doc below) ended up landing almost exactly back at its
+    /// pre-rewrite value once a real peeling bug was fixed (see `docs/decisions.md`), not stranded
+    /// worse the way an early measurement of this same rewrite briefly suggested.
+    pub const PASSAGE_WIN_PCT_PLOVER: f64 = 70.0;
+    pub const PASSAGE_WIN_PCT_LAPWING: f64 = 85.0;
     /// Share of individual words where lyk strictly beats the other theory on keys.
-    pub const WORD_FEWER_KEYS_PCT_PLOVER: f64 = 21.5;
-    pub const WORD_FEWER_KEYS_PCT_LAPWING: f64 = 34.0;
+    pub const WORD_FEWER_KEYS_PCT_PLOVER: f64 = 23.5;
+    pub const WORD_FEWER_KEYS_PCT_LAPWING: f64 = 36.5;
     /// Share of individual words where lyk strictly *loses* on keys - capped, so a change that
     /// quietly makes more words worse doesn't hide behind an unrelated set of words getting better.
     ///
-    /// The Plover cap moved the "wrong" way here (9.5 -> 12.0), a deliberate, understood trade, not
-    /// a regression nobody noticed: the solver now genuinely minimizes total frequency-weighted
-    /// cost across the *whole* dictionary at once, not "how many individual words tie or beat
-    /// Plover" - a handful more rare words individually costing a star or a key more than Plover's
-    /// own brief is the accepted price of a strictly better aggregate (`AGGREGATE_SAVINGS_PCT_PLOVER`
-    /// nearly quadrupled in the same change). Lapwing's own cap tightened instead (5.5 -> 4.5),
-    /// since that side only ever improved.
-    pub const WORD_MORE_KEYS_PCT_PLOVER_MAX: f64 = 12.0;
-    pub const WORD_MORE_KEYS_PCT_LAPWING_MAX: f64 = 4.5;
+    /// The solver now genuinely minimizes total frequency-weighted cost across the *whole*
+    /// dictionary at once, not "how many individual words tie or beat Plover" - a handful more rare
+    /// words individually costing a star or a key more than Plover's own brief would be an accepted
+    /// price for a strictly better aggregate, if it actually came to that; measured today, it
+    /// barely has (9.5 -> 9.9, essentially flat), while the aggregate itself improved by nearly 5x
+    /// (`AGGREGATE_SAVINGS_PCT_PLOVER`). Lapwing's own cap tightened too (5.5 -> 4.0), since that
+    /// side only ever improved.
+    pub const WORD_MORE_KEYS_PCT_PLOVER_MAX: f64 = 10.5;
+    pub const WORD_MORE_KEYS_PCT_LAPWING_MAX: f64 = 4.0;
     /// How much cheaper lyk's aggregate key total must be, as a percentage of the other theory's
     /// own total - the single hardest number to fake, since it is not swayed by lots of tiny common
     /// words tying (`a`, `the`, `is` cost the same everywhere) the way a per-word percentage is.
-    pub const AGGREGATE_SAVINGS_PCT_PLOVER: f64 = 4.3;
-    pub const AGGREGATE_SAVINGS_PCT_LAPWING: f64 = 10.5;
+    pub const AGGREGATE_SAVINGS_PCT_PLOVER: f64 = 5.5;
+    pub const AGGREGATE_SAVINGS_PCT_LAPWING: f64 = 12.0;
 }
 
 /// Prints the full breakdown (`cargo test --release quote_corpus -- --nocapture` to see it) and

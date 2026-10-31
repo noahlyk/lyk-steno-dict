@@ -824,35 +824,46 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
     }
 
     // Fixed-point peeling: most of the dictionary's own cheapest remaining candidate is a text
-    // nobody else currently wants most either - settling those first keeps the real solver's own
+    // nobody else can possibly want either - settling those first keeps the real solver's own
     // input small (see `solve_contested`'s own doc for why that matters for the algorithm chosen).
-    // A word's *list length* is not the right peeling test on its own: every word with a plain
-    // rules reading always carries its own four star-ladder fallbacks too (source 5 in
-    // `enumerate_candidates`), each strictly more expensive than the word's own best pick and
-    // *never* actually wanted unless that best pick is lost to someone else - so almost every word
-    // starts with five-plus candidates regardless of whether any of them are really contested.
-    // What actually matters is each word's own *cheapest remaining* candidate: sort every list
-    // ascending by cost once, then a word is peelable the moment it is the only one whose cheapest
-    // remaining candidate renders to a given text. Settling it removes that text from every other
-    // word's list (wherever it sits, not just at the front) and tries again - a word that just lost
-    // its own former cheapest candidate this way falls through to its own next-cheapest
-    // automatically, the same star ladder it would have reached anyway, just without the solver
-    // needing to adjudicate it. Runs in rounds to a true fixed point rather than a single pass,
-    // since settling one round's uniquely-claimed texts can turn the *next*-cheapest candidate of a
-    // previously-tied word into a new, now-unique claim.
+    // Two things that are *not* quite the right peeling test, both tried and both wrong in a way
+    // only the real dictionary surfaced:
+    // - A word's *list length* on its own: every word with a plain rules reading always carries
+    //   its own four star-ladder fallbacks too (source 5 in `enumerate_candidates`), each strictly
+    //   more expensive than the word's own best pick and *never* actually wanted unless that best
+    //   pick is lost to someone else - so almost every word starts with five-plus candidates
+    //   regardless of whether any of them are really contested.
+    // - Whether a word's cheapest pick is the unique *cheapest* pick among every other remaining
+    //   word: this missed a real case (`on`'s own second-cheapest, "OPB", quietly handed to `gone`
+    //   because nothing else's own *top* choice was "OPB" - even though `on` still had "OPB"
+    //   sitting lower in its own list, worth far more to `on`, which never got a say since it was
+    //   still holding out for its own cheaper, contested "O"). Peeling must never hand out a text
+    //   some other remaining word could still end up wanting, no matter how far down that word's
+    //   own list it sits.
+    // The test that is actually safe: a word's own cheapest remaining candidate is peelable only
+    // when its *text* appears in no other remaining word's list at all, anywhere - not merely
+    // "nobody else's own top pick is this text." Settling it removes that text from every other
+    // word's list and tries again - a word that just lost its own former cheapest candidate this
+    // way falls through to its own next-cheapest automatically, the same star ladder it would have
+    // reached anyway, just without the solver needing to adjudicate it. Runs in rounds to a true
+    // fixed point, since settling one round's uniquely-owned texts can turn a previously-contested
+    // word's own next-cheapest into a newly-unique one.
     for candidates in remaining.values_mut() {
         candidates.sort_by_key(|c| c.cost);
     }
     loop {
-        let mut top_claim: HashMap<String, Vec<&str>> = HashMap::new();
+        let mut owners: HashMap<String, Vec<&str>> = HashMap::new();
         for (&word, candidates) in &remaining {
-            let text = render_outline(&candidates[0].outline);
-            top_claim.entry(text).or_default().push(word);
+            for candidate in candidates {
+                owners.entry(render_outline(&candidate.outline)).or_default().push(word);
+            }
         }
-        let resolved: Vec<(&str, String)> = top_claim
-            .into_iter()
-            .filter(|(_, claimants)| claimants.len() == 1)
-            .map(|(text, claimants)| (claimants[0], text))
+        let resolved: Vec<(&str, String)> = remaining
+            .keys()
+            .filter_map(|&word| {
+                let text = render_outline(&remaining[word][0].outline);
+                (owners[&text].len() == 1).then_some((word, text))
+            })
             .collect();
         if resolved.is_empty() {
             break;
@@ -1611,13 +1622,13 @@ mod tests {
 
     #[test]
     fn a_word_named_in_briefs_toml_as_a_literal_outline_gets_exactly_that_one_candidate() {
-        // `make` is pinned today (`rules/briefs.toml`) to its own correct phonetic reading - a
-        // human decision this function must never reopen to competition against its own word's
-        // other candidate sources.
+        // `up` is pinned today (`rules/briefs.toml`, `up = "-P"`) to a one-key brief its own plain
+        // rules reading ("UP") would never reach on its own - a human decision this function must
+        // never reopen to competition against its own word's other candidate sources.
         let briefs = Briefs::built_in().unwrap();
-        let candidates = candidates_for("make", &briefs);
+        let candidates = candidates_for("up", &briefs);
         assert_eq!(candidates.len(), 1, "a literal override must force exactly one candidate");
-        assert_eq!(render_outline(&candidates[0].outline), "PHAEUBG");
+        assert_eq!(render_outline(&candidates[0].outline), "-P");
         assert_eq!(candidates[0].origin, Origin::Brief);
     }
 
@@ -1652,6 +1663,66 @@ mod tests {
         );
         assert_eq!(render_outline(&cheapest_candidate(&take).outline), "TAEBG");
         assert_eq!(render_outline(&cheapest_candidate(&takes).outline), "TAEBGS");
+    }
+
+    #[test]
+    fn the_acceptance_gate_reproduces_or_beats_every_removed_override() {
+        // Plan verification step 4: the 18 `rules/briefs.toml` overrides whose own comments cited
+        // the greedy-ordering/fragment-check bug this whole redesign exists to fix have now been
+        // removed from the real file - this runs the real, full dictionary (`dictionary_fixture`,
+        // the built-in briefs as they actually ship) and checks every one of those 18 words landed
+        // on the override's own outline, something strictly cheaper, or - for the six words below -
+        // the theory's own correct, legitimate full reading.
+        //
+        // `on`/`from`/`no`/`then`/`day`/`which` are a different shape of override than the other
+        // twelve: their own literal text (`"OB"`, `"PR"`, `"PHO"`, `"THEB"`, `"TAEU"`, `"KH"`) was a
+        // deliberate, hand-picked exploit of a gap `best_brief` had - a half-held chord
+        // `matches_real_consonants` would reject from *any* ordinary candidate, bypassed only
+        // because a literal `[word]` override skips that check entirely. `enumerate_candidates`
+        // closes that exact gap (the blanket filter applies to every raw brief candidate now, not
+        // just the ones `best_brief` bothered to rank), so comparing the new pipeline's answer
+        // against the *raw cost* of text that could never legally win again isn't a fair bar -
+        // nothing shorter than the word's own correct, full reading is legal for these six anymore,
+        // override or not. The fair comparison instead is the fact that the override's own comments
+        // state outright what the alternative was: "the rules' own full reading" - and that is
+        // exactly, letter for letter, what this pipeline reproduces unprompted. make/but, and the 10
+        // stranded-word fixes, had no such exploit (their own override text is still a perfectly
+        // legal candidate either way), so those ten still compare on raw cost directly.
+        let exploit_closed: &[(&str, &str)] =
+            &[("on", "OPB"), ("from", "TPR"), ("no", "TPHO"), ("then", "THEPB"), ("day", "TKAEU"), ("which", "WHEUFP")];
+        let lyk = crate::dictionary_fixture::cheapest();
+        for &(word, correct_full_reading) in exploit_closed {
+            let actual = lyk
+                .get(word)
+                .unwrap_or_else(|| panic!("{word:?} has no outline at all in the real dictionary"));
+            assert_eq!(
+                render_outline(actual),
+                correct_full_reading,
+                "{word}: expected the theory's own correct full reading (the override's own \
+                 documented alternative to its closed exploit)"
+            );
+        }
+
+        let setup = crate::dictionary_fixture::setup();
+        let exploit_closed_words: Vec<&str> = exploit_closed.iter().map(|&(w, _)| w).collect();
+        for (word, overridden) in OVERRIDDEN_WORDS {
+            if exploit_closed_words.contains(word) {
+                continue;
+            }
+            let mut forced = parse_outline(overridden).expect("every override text parses");
+            setup.rules.joined(&mut forced);
+            let overridden_cost = candidate_cost(&forced);
+            let actual = lyk
+                .get(word)
+                .unwrap_or_else(|| panic!("{word:?} has no outline at all in the real dictionary"));
+            let actual_cost = candidate_cost(actual);
+            assert!(
+                actual_cost <= overridden_cost,
+                "{word}: the real dictionary's outline ({}, cost {actual_cost}) is worse than the \
+                 removed override {overridden:?} (cost {overridden_cost})",
+                render_outline(actual)
+            );
+        }
     }
 
     #[test]
