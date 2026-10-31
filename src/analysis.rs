@@ -482,7 +482,15 @@ pub fn check_readme(
 pub fn explain(setup: &Setup, dictionary: &HashMap<&str, &[Stroke]>, word: &str) -> Result<()> {
     let word = word.to_lowercase();
     let Some(variants) = setup.pron.get(&word) else {
-        println!("{word}: no pronunciation in CMUdict");
+        // No pronunciation at all for the rules to run from: spelling mode, letter by letter,
+        // is the real fallback here, not a plain miss - see `Rules::spell_word`.
+        match setup.rules.spell_word(&word) {
+            Some(outline) => println!(
+                "{word}: no pronunciation in CMUdict, spelled out: {}",
+                render_outline(&outline)
+            ),
+            None => println!("{word}: no pronunciation in CMUdict, and not spellable (a-z only)"),
+        }
         return Ok(());
     };
     for sounds in variants {

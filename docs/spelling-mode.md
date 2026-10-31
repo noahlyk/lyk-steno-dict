@@ -68,9 +68,9 @@ you're going to spell something out, but no help deciding *how* to spell it: han
 `rules/spelling.toml`, isn't something a learner should have to do. `Rules::spell_word` is the
 exact inverse of `resolve_spelling`: given the word, it looks each letter up in the same table and
 produces that same outline directly, `~` on the first stroke and `+` on every one after it — `None`
-for any word with a character the table has no chord for (anything outside plain a-z). This is what
-a lookup tool should fall back to once a word has no pronunciation at all for the phonetic rules to
-run from, rather than reporting the word as simply untypeable.
+for any word with a character the table has no chord for (anything outside plain a-z). `lookup`,
+`explain`, and `quote` all fall back to it once a word has no pronunciation at all for the phonetic
+rules to run from, rather than reporting the word as simply untypeable.
 
 ## Not yet wired to a physical key
 

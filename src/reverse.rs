@@ -3,10 +3,9 @@
 //! Mirrors keymux's own `src/steno/reverse.rs` (the engine's live lookup and its CLI share) so
 //! the two answer the same way: a query with no lowercase letter that parses as a stroke outline
 //! resolves forward (what does this stroke type); anything else is text to find the stroke(s)
-//! for, a single word or a whole phrase, word by word, next to Plover's and Lapwing's. There is
-//! no fingerspelling data in this repo (that lives in the deployed config's own "Emily's
-//! modifiers" dictionary, not here), so a word with no pronunciation at all is simply unanswered
-//! rather than spelled out, unlike keymux's own version.
+//! for, a single word or a whole phrase, word by word, next to Plover's and Lapwing's. A word with
+//! no pronunciation at all falls back to [`crate::rules::Rules::spell_word`]'s spelling-mode
+//! outline rather than going unanswered - see `docs/spelling-mode.md`.
 
 use crate::analysis::Setup;
 use crate::stroke::{self, Stroke, render_outline};
@@ -44,17 +43,20 @@ pub struct WordLookup {
 
 /// A word's real, settled outline - the same answer `resolve`, `quote`, and the deployed
 /// dictionary itself would give, not an independently re-derived approximation. Falls back to the
-/// rules' own raw candidates only for a word `dictionary` has nothing for at all (one ranked past
+/// rules' own raw candidates for a word `dictionary` has nothing for at all (one ranked past
 /// whatever `common` the dictionary was built with, or not a real English word - `ander` has no
 /// dictionary entry of its own, since nobody writes "ander", but the rules can still read it back
-/// once struck; see `Rules::resolve`'s own stem-recognition fallback for that case instead).
+/// once struck; see `Rules::resolve`'s own stem-recognition fallback for that case instead), then
+/// to spelling mode for a word with no pronunciation on record for the rules to run from at all
+/// (`stenography`; see `Rules::spell_word`).
 #[must_use]
 pub fn reverse_word(setup: &Setup, dictionary: &HashMap<&str, &[Stroke]>, word: &str) -> WordLookup {
     let lower = word.to_lowercase();
     let lyk = dictionary
         .get(lower.as_str())
         .map(|o| render_outline(o))
-        .or_else(|| setup.candidates(&lower).into_iter().next());
+        .or_else(|| setup.candidates(&lower).into_iter().next())
+        .or_else(|| setup.rules.spell_word(&lower).map(|o| render_outline(&o)));
     let (plover, lapwing) = setup.gold.shortest(&lower);
     WordLookup {
         word: word.to_string(),
@@ -95,5 +97,12 @@ mod tests {
     fn empty_input_is_text_not_a_stroke() {
         assert_eq!(classify(""), Query::Text(String::new()));
         assert_eq!(classify("   "), Query::Text(String::new()));
+    }
+
+    #[test]
+    fn a_word_with_no_pronunciation_falls_back_to_spelling_mode() {
+        let setup = Setup::load(std::path::Path::new("data"), None, Some(1_000)).unwrap();
+        let found = reverse_word(&setup, &HashMap::new(), "stenography");
+        assert_eq!(found.lyk.as_deref(), Some("~S/+T/+E/+TPH/+O/+TKPW/+R/+A/+P/+H/+KWH"));
     }
 }
