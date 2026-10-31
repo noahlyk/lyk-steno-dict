@@ -577,3 +577,23 @@ keys/stroke, still beating Plover's 3.51 -> 3.52 and Lapwing's 3.93 -> 3.94. `qu
 thresholds and the README's own tables were both raised/refreshed in the same change, per this
 project's established practice of never leaving a number stranded below what the theory now
 actually does.
+
+**A blanket fragment-safety filter on gold-brief candidates was added, then reverted the same
+day, for directly contradicting the day-4 philosophy reversal (`gold_candidates`,
+`src/generate.rs`).** The solver-rewrite plan (above) specified rejecting any raw Plover/Lapwing
+candidate `matches_real_consonants` flagged as holding only part of a real sound - reasonable
+under the *old* "every outline should be sound-derivable" philosophy, since that's exactly the
+rigor `best_brief` lacked. But the plan was written and approved in the same session as, and
+without re-checking against, the explicit reversal that a candidate holding no trace of a word's
+own sound is no longer disqualifying by itself. The filter forced `which`, `on`, `from`, `no`,
+`then`, and `day` back to their full phonetic readings, undoing six fixes made earlier the same
+session specifically to shorten them - confirmed as a real regression when the user named `which`
+→ `KH` as their favorite example of the new philosophy, immediately after the rewrite had taken
+it away. Reverted: a raw gold candidate is now offered regardless of whether it holds a complete
+or only a partial real sound: both the raw and `drop_fragments`' own, more aggressive repair
+compete purely on cost, same as everything else. Net effect was not neutral - it was a further
+*improvement*, not just restoring the six words: aggregate savings rose again (6.1%/12.5% ->
+7.5%/13.8% vs Plover/Lapwing), word-level losses to Plover dropped (9.9% -> 5.7%). **If a future
+change wants to reintroduce sound-correspondence as a requirement for any candidate, that is
+reopening the day-4 reversal, not a neutral correctness fix** - the two are in direct, confirmed
+tension, and the reversal is the one the user actually wants.

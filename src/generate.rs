@@ -173,13 +173,21 @@ pub fn candidate_cost(outline: &[Stroke]) -> u32 {
 }
 
 /// Every raw and drop-repaired candidate from one gold dictionary's own listed outlines for
-/// `word`, in list order: a fragment-safe raw outline as itself, plus its drop-repair whenever
-/// `drop_fragments` finds one to offer alongside it. Unlike `best_brief`'s own pre-solver version
-/// of this (now gone), a raw outline that only holds *part* of a real key combination is never
-/// offered at all here - not even as a worse-ranked fallback - since the solver has a real
-/// alternative (the repair, or another source's candidate entirely) to reach for instead of ever
-/// needing to settle for a half-held chord. See `enumerate_candidates`'s own doc for why this is
-/// new rigor over what `best_brief` used to allow.
+/// `word`, in list order: the raw outline as itself, plus its drop-repair whenever
+/// `drop_fragments` finds one to offer alongside it. A raw outline that only holds *part* of a
+/// real key combination (`OB` for "on", missing half its real `-PB` coda) is still offered here,
+/// not screened out - under the post-reversal philosophy (see `docs/decisions.md`'s "core
+/// philosophy reversed" entry) a candidate holding no trace, or only part of a trace, of a word's
+/// own sound is not disqualifying by itself, only its cost is what decides. An earlier version of
+/// this function rejected any raw candidate `matches_real_consonants` flagged, which was the right
+/// call under the old "every outline should be sound-derivable" philosophy but directly
+/// contradicted the reversal once it landed - it cost `which` its own `KH` (confirmed: the user's
+/// own, explicitly favorite example) and five other words a real key-count regression for no
+/// benefit, since the thing it was guarding against (a result that doesn't sound like the word) is
+/// no longer something this project avoids. Both the raw and the repaired candidate still compete
+/// on cost like anything else - `drop_fragments`'s own, more aggressive strip (dropping the
+/// fragment's bits entirely rather than keeping even the partial chord) remains worth offering
+/// alongside the raw form, since it's sometimes shorter still (`make` -> `AEUBG`).
 fn gold_candidates(
     rules: &crate::rules::Rules,
     outlines: Option<&Vec<String>>,
@@ -189,12 +197,10 @@ fn gold_candidates(
     let mut found = Vec::new();
     for text in outlines.into_iter().flatten() {
         let Some(raw) = parse_outline(text) else { continue };
-        if rules.matches_real_consonants(&raw, word, sounds) {
-            found.push(raw.clone());
-        }
         if let Some(repaired) = rules.drop_fragments(&raw, word, sounds) {
             found.push(repaired);
         }
+        found.push(raw);
     }
     found
 }
@@ -216,9 +222,9 @@ fn gold_candidates(
 ///    *both* `setup.gold.plover` and `setup.gold.lapwing` are merged unconditionally (today only
 ///    one source is ever tried, gated by `briefs.default`/`briefs.word`'s `"plover"`/`"lapwing"`
 ///    selector - that gating only ever narrows *which* dictionaries to merge now, never whether a
-///    brief competes at all). `matches_real_consonants` is a blanket filter here on every raw
-///    candidate (new rigor `best_brief` never had outside its own dropped-candidate sort) - see
-///    `gold_candidates`.
+///    brief competes at all). Every raw candidate competes regardless of whether it holds a real,
+///    complete sound or only a fragment of one - see `gold_candidates`'s own doc for why a blanket
+///    `matches_real_consonants` filter was tried here and reverted.
 /// 2. **Rules-derived candidate**: `setup.rules.outline(word, sounds)` - lyk's own plain reading,
 ///    unconditionally, for every word with a brief or not. This is the piece missing from the old
 ///    brief pool entirely, and the whole reason lyk's own derivation used to never get a chance to
@@ -917,11 +923,12 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
     // since words in different components can never affect each other's optimal assignment at
     // all, and this is what actually keeps `solve_contested`'s own input small in practice - the
     // contested set as a whole runs well past the "hundreds to low thousands" this plan's own
-    // scale estimate assumed (the blanket `matches_real_consonants` filter's deeper fragment-drops
-    // mean a lot more words now converge on the same small handful of very short, nearly-bare
-    // outlines than a single shared-source brief pool ever produced), but it turns out to be many
-    // small, unrelated clusters rather than one giant tangle - running SSP once per cluster instead
-    // of once over everything is what makes this tractable at the real dictionary's scale.
+    // scale estimate assumed (merging every gold source's own listed candidates, not just one, plus
+    // every raw and drop-repaired variant of each, means a lot more words now converge on the same
+    // small handful of very short, nearly-bare outlines than a single shared-source brief pool ever
+    // produced), but it turns out to be many small, unrelated clusters rather than one giant tangle
+    // - running SSP once per cluster instead of once over everything is what makes this tractable at
+    // the real dictionary's scale.
     // Every lookup and traversal below is sorted, not just hashed - `HashMap`/`HashSet` iteration
     // order is randomized per process, and without this, which of several equally-sized or
     // equally-costed outcomes a run happens to land on (component order, node numbering inside
@@ -1671,44 +1678,18 @@ mod tests {
         // the greedy-ordering/fragment-check bug this whole redesign exists to fix have now been
         // removed from the real file - this runs the real, full dictionary (`dictionary_fixture`,
         // the built-in briefs as they actually ship) and checks every one of those 18 words landed
-        // on the override's own outline, something strictly cheaper, or - for the six words below -
-        // the theory's own correct, legitimate full reading.
+        // on the override's own outline or something strictly cheaper.
         //
-        // `on`/`from`/`no`/`then`/`day`/`which` are a different shape of override than the other
-        // twelve: their own literal text (`"OB"`, `"PR"`, `"PHO"`, `"THEB"`, `"TAEU"`, `"KH"`) was a
-        // deliberate, hand-picked exploit of a gap `best_brief` had - a half-held chord
-        // `matches_real_consonants` would reject from *any* ordinary candidate, bypassed only
-        // because a literal `[word]` override skips that check entirely. `enumerate_candidates`
-        // closes that exact gap (the blanket filter applies to every raw brief candidate now, not
-        // just the ones `best_brief` bothered to rank), so comparing the new pipeline's answer
-        // against the *raw cost* of text that could never legally win again isn't a fair bar -
-        // nothing shorter than the word's own correct, full reading is legal for these six anymore,
-        // override or not. The fair comparison instead is the fact that the override's own comments
-        // state outright what the alternative was: "the rules' own full reading" - and that is
-        // exactly, letter for letter, what this pipeline reproduces unprompted. make/but, and the 10
-        // stranded-word fixes, had no such exploit (their own override text is still a perfectly
-        // legal candidate either way), so those ten still compare on raw cost directly.
-        let exploit_closed: &[(&str, &str)] =
-            &[("on", "OPB"), ("from", "TPR"), ("no", "TPHO"), ("then", "THEPB"), ("day", "TKAEU"), ("which", "WHEUFP")];
-        let lyk = crate::dictionary_fixture::cheapest();
-        for &(word, correct_full_reading) in exploit_closed {
-            let actual = lyk
-                .get(word)
-                .unwrap_or_else(|| panic!("{word:?} has no outline at all in the real dictionary"));
-            assert_eq!(
-                render_outline(actual),
-                correct_full_reading,
-                "{word}: expected the theory's own correct full reading (the override's own \
-                 documented alternative to its closed exploit)"
-            );
-        }
-
+        // `on`/`from`/`no`/`then`/`day`/`which` were briefly a different shape of check here: an
+        // earlier version of `gold_candidates` rejected any raw candidate `matches_real_consonants`
+        // flagged (a half-held chord, like `which`'s own `KH` missing half of `WH`'s real chord),
+        // which forced these six back up to their full phonetic reading - a real, user-confirmed
+        // regression against the day-4 philosophy reversal ("nothing about a candidate needs to
+        // sound like the word"), reverted once found. All 18 words now compare the same way: the
+        // real dictionary's cost must be at or below the removed override's own cost.
         let setup = crate::dictionary_fixture::setup();
-        let exploit_closed_words: Vec<&str> = exploit_closed.iter().map(|&(w, _)| w).collect();
+        let lyk = crate::dictionary_fixture::cheapest();
         for (word, overridden) in OVERRIDDEN_WORDS {
-            if exploit_closed_words.contains(word) {
-                continue;
-            }
             let mut forced = parse_outline(overridden).expect("every override text parses");
             setup.rules.joined(&mut forced);
             let overridden_cost = candidate_cost(&forced);
@@ -1811,12 +1792,12 @@ mod tests {
 
     #[test]
     fn six_of_the_fragment_check_overrides_reproduce_exactly_in_isolation() {
-        // Unlike `make`/`but`/`on`/`from`/`no`/`then`/`day`/`which` (see this module's own report
-        // for why those land on something cheaper instead - the blanket `matches_real_consonants`
-        // filter in `enumerate_candidates` finds an even deeper, legal fragment-drop than the
-        // human override itself was), these six stranded-word fixes are already the natural
-        // pool's own cheapest candidate, confirmed here in isolation before the real solver (with
-        // every other word also contesting the dictionary) ever runs.
+        // Unlike `make`/`but` (`drop_fragments` finds an even deeper, legal strip than the human
+        // override itself used) or `on`/`from`/`no`/`then`/`day`/`which` (their own override text
+        // is a real, legal candidate again - see `gold_candidates`'s own doc for the blanket-filter
+        // revert), these six stranded-word fixes are already the natural pool's own cheapest
+        // candidate, confirmed here in isolation before the real solver (with every other word also
+        // contesting the dictionary) ever runs.
         let exact: &[(&str, &str)] = &[
             ("wow", "WOU"),
             ("honest", "OPBS"),
