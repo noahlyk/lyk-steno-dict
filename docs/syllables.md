@@ -18,7 +18,10 @@ final `a` is a syllable of its own (*china* KHAOEU/+TPHA). Suffix clusters both 
 are rules: `-ment` -PLT, `-tion` -GS, `-ting` -GT, `-ding` -GD, and Plover's F for an S before
 another consonant (*castle* KAFL, *lesson* HREFPB).
 
-**Backup entries: a shorter word's own outline, plus whatever is left over.** The fold above only
+**Backup entries: a shorter word's own outline, plus whatever is left over.** This is where [the
+design principle stated up front](README.md) — one single-stroke outline per word, but unlimited
+multi-stroke ones judged on predictability rather than brevity — turns into actual generated
+entries. The fold above only
 ever happens to keep a word consistent with a shorter relative when cramming everything onto one
 stroke isn't physically possible — *breaking* keeps *break*'s own `PWRAEUBG` only because `PWRAEUBG`
 plus a second "k" has nowhere to go; *building* has no such excuse, so its own cheapest outline is
