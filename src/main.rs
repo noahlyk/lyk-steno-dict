@@ -81,8 +81,9 @@ enum Command {
         #[arg(long, default_value = "out/lyk-orthographic-fallback.rs")]
         out: PathBuf,
         /// Words to cover when building the dictionary's single-stroke stem table, most common
-        /// first
-        #[arg(long, default_value_t = 30_000)]
+        /// first. Matches `build`/`deploy`'s own default: a smaller count leaves out mid-frequency
+        /// words the real, deployed stem table knows about.
+        #[arg(long, default_value_t = 100_000)]
         common: usize,
         /// Briefs to use instead of the built-in ones
         #[arg(long)]
@@ -107,8 +108,12 @@ enum Command {
     },
     /// Grab a random quote off the web and stroke it out, lyk next to Plover and Lapwing
     Quote {
-        /// Words to cover when building the dictionary, most common first
-        #[arg(long, default_value_t = 30_000)]
+        /// Words to cover when building the dictionary, most common first. Matches `build`'s own
+        /// default so a quote shows the outlines the real, deployed dictionary actually has, not
+        /// a smaller build's weaker stand-ins for words ranked past wherever a lower count cuts
+        /// off (a mid-frequency word can only earn its full brevity treatment once the generator
+        /// has placed enough of the words ahead of it to know what's still free).
+        #[arg(long, default_value_t = 100_000)]
         common: usize,
         /// Briefs to use instead of the built-in ones
         #[arg(long)]
@@ -123,8 +128,9 @@ enum Command {
     Resolve {
         /// A stroke outline, such as `KAT` or `TPAEU/+HR`
         outline: String,
-        /// Words to cover when building the dictionary, most common first
-        #[arg(long, default_value_t = 30_000)]
+        /// Words to cover when building the dictionary, most common first. Matches `build`'s own
+        /// default so a resolved reading matches what the real, deployed dictionary would do.
+        #[arg(long, default_value_t = 100_000)]
         common: usize,
         /// Briefs to use instead of the built-in ones
         #[arg(long)]
@@ -138,8 +144,9 @@ enum Command {
         /// The word, phrase, or stroke to look up
         query: String,
         /// Words to cover when building the dictionary, most common first (only matters for a
-        /// stroke query, which has to generate the dictionary to tell a real entry from a miss)
-        #[arg(long, default_value_t = 30_000)]
+        /// stroke query, which has to generate the dictionary to tell a real entry from a miss).
+        /// Matches `build`'s own default so a lookup matches the real, deployed dictionary.
+        #[arg(long, default_value_t = 100_000)]
         common: usize,
         /// Briefs to use instead of the built-in ones
         #[arg(long)]
