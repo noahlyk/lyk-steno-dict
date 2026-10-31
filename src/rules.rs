@@ -1175,6 +1175,30 @@ impl Rules {
         table.get(token).or_else(|| cluster.get(token)).copied()
     }
 
+    /// Bits legitimately spoken for by some syllable *other than* `exclude`'s own onset or
+    /// coda — a one-stroke brief for a multi-syllable word routinely holds more than one
+    /// syllable's sounds at once, and a bit that's already a different syllable's own complete
+    /// sound isn't a fragment of anything, no matter which unrelated cluster it also happens to
+    /// overlap. Used to clear a stray bit before checking it against the *first* syllable's onset
+    /// or the *last* syllable's coda, so a real, complete middle (or, symmetrically, first/last)
+    /// cluster can never be mistaken for a partial attempt at some other syllable's own sound —
+    /// see [`Self::matches_real_consonants`]'s own doc comment for the `district`/`describe`/
+    /// `captain` cases this resolves.
+    fn explained_elsewhere(&self, syllables: &[Syllable], exclude: usize) -> u32 {
+        syllables
+            .iter()
+            .enumerate()
+            .filter(|&(i, _)| i != exclude)
+            .flat_map(|(_, syllable)| {
+                syllable
+                    .onset
+                    .iter()
+                    .filter_map(|t| Self::token_bits(t, &self.onset, &self.onset_cluster))
+                    .chain(syllable.coda.iter().filter_map(|t| Self::token_bits(t, &self.coda, &self.coda_cluster)))
+            })
+            .fold(0, |acc, stroke| acc | stroke.0)
+    }
+
     /// Whether this outline's first onset and last coda are each a whole key or cluster toward
     /// the word's own real first and last sound, never half of one. Plover and Lapwing's own
     /// shortest brief for a word is sometimes their own theory's memorized one-off trick that
@@ -1188,16 +1212,21 @@ impl Rules {
     /// all, so there's nothing to fragment, and it's exactly as learnable as any other memorized
     /// brief, nothing new to work out. Only a sound's *own* keys, partly present, are rejected.
     ///
-    /// Known blind spot: this only ever checks the *first* syllable's onset and the *last*
-    /// syllable's coda, so a multi-key cluster belonging to a syllable strictly in between is
-    /// invisible to it. If that middle cluster happens to share a key with the first syllable's
-    /// own (often-reduced) onset, a candidate that correctly keeps the whole middle cluster can
-    /// still be flagged and "repaired" into dropping part of it — not a fragment of the sound it
-    /// was actually attempting. `district`'s `TR-T` (the real "tr" of its second syllable) and
-    /// `describe`'s `SKREU` (the real "skr" of its second syllable) both hit this, because each
-    /// word's own first sound reduces to a "d" sharing a key with that later cluster; see
-    /// `rules/briefs.toml`'s own note on them for the literal overrides this forced. Worth fixing
-    /// properly — this generalizes to any multi-syllable word, not just those two.
+    /// This only ever checks the *first* syllable's onset and the *last* syllable's coda — a
+    /// one-stroke brief for a longer word routinely condenses every syllable in between onto that
+    /// same stroke too, and [`Self::explained_elsewhere`] is what keeps those middle (or, the
+    /// mirror case, first/last) syllables' own complete sounds from being mistaken for a fragment
+    /// of the one actually being checked, in both directions this used to get wrong:
+    /// `district`/`describe` reduce their own real first sound (a "d") to nothing, so their
+    /// one-stroke brief's left-hand keys are entirely the *second* syllable's own "tr"/"skr"
+    /// cluster — correctly whole, but sharing a key with "d"'s own onset cluster, which used to
+    /// get this flagged as a fragment of "d" and "repaired" into dropping a real "t"/"k" out of
+    /// "tr"/"skr" (`rules/briefs.toml` pinned both to their correct, literal outline to work
+    /// around it). `captain` is the mirror case on the coda side: its own first syllable's real,
+    /// legitimate coda "p" shares a key with the word's entirely-dropped final syllable's own "n"
+    /// cluster (`-PB`), which used to flag the brief `KAPT` as holding only a fragment of "n" and
+    /// offer `KAT` — `cat`'s own natural outline — as a "repair", displacing `cat` onto a starred
+    /// variant for no reason related to `cat` at all.
     pub fn matches_real_consonants(&self, outline: &[Stroke], word: &str, sounds: &[String]) -> bool {
         let Some(syllables) = self.syllables(&self.label(word, sounds)) else {
             return true;
@@ -1210,8 +1239,9 @@ impl Rules {
         ) else {
             return true;
         };
-        let onset_bits = first_stroke.0 & Stroke::LEFT;
-        let coda_bits = last_stroke.0 & (Stroke::RIGHT | Stroke::STAR);
+        let last_index = syllables.len() - 1;
+        let onset_bits = first_stroke.0 & Stroke::LEFT & !self.explained_elsewhere(&syllables, 0);
+        let coda_bits = last_stroke.0 & (Stroke::RIGHT | Stroke::STAR) & !self.explained_elsewhere(&syllables, last_index);
         let no_fragment = |tokens: &[String], bits: u32, table: &HashMap<String, Stroke>, cluster: &HashMap<String, Stroke>| {
             tokens
                 .iter()
@@ -1249,8 +1279,9 @@ impl Rules {
             outline.first()?,
             outline.last()?,
         );
-        let onset_bits = first_stroke.0 & Stroke::LEFT;
-        let coda_bits = last_stroke.0 & (Stroke::RIGHT | Stroke::STAR);
+        let last_index = syllables.len() - 1;
+        let onset_bits = first_stroke.0 & Stroke::LEFT & !self.explained_elsewhere(&syllables, 0);
+        let coda_bits = last_stroke.0 & (Stroke::RIGHT | Stroke::STAR) & !self.explained_elsewhere(&syllables, last_index);
         let onset_fragment = Self::fragment_bits(&first.onset, onset_bits, &self.onset, &self.onset_cluster);
         let coda_fragment = Self::fragment_bits(&last.coda, coda_bits, &self.coda, &self.coda_cluster);
         if onset_fragment == 0 && coda_fragment == 0 {
@@ -1797,6 +1828,27 @@ mod tests {
             rules.resolve_stroke(Stroke(Stroke::STAR | Stroke::JOIN)),
             None
         );
+    }
+
+    #[test]
+    fn an_earlier_syllables_own_sound_is_never_mistaken_for_a_fragment_of_a_later_one() {
+        let rules = Rules::built_in().unwrap();
+        // "captain"'s own first syllable really does end in a "p" (K AE1 | P T AH0 N); that "p"
+        // happens to share a key with the entirely-dropped final syllable's "n" cluster (`-PB`),
+        // which used to make `KAPT` look like it held only a fragment of "n" - wrongly, since the
+        // brief isn't attempting "n" at all. See `rules/briefs.toml`'s `district`/`describe` note
+        // for the mirror case on the onset side.
+        let captain = sounds("K AE1 P T AH0 N");
+        let kapt = parse_outline("KAPT").unwrap();
+        assert!(rules.matches_real_consonants(&kapt, "captain", &captain));
+        assert_eq!(rules.drop_fragments(&kapt, "captain", &captain), None);
+        // `district`'s real first sound (a "d") reduces to nothing, so its one-stroke brief's
+        // left-hand keys are entirely the *second* syllable's own "tr" cluster - correctly whole,
+        // but sharing a key with "d"'s own onset cluster (`TK`).
+        let district = sounds("D IH1 S T R IH0 K T");
+        let tr_t = parse_outline("TR-T").unwrap();
+        assert!(rules.matches_real_consonants(&tr_t, "district", &district));
+        assert_eq!(rules.drop_fragments(&tr_t, "district", &district), None);
     }
 
     #[test]

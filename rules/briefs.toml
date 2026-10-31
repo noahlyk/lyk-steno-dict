@@ -172,16 +172,21 @@ yourselves = "plover"     # KWRURSZ, 7 keys, vs. the rules' 11-key KWRUR/SEFLZ
 disease = "plover"        # TK-Z, 3 keys, vs. the rules' 7-key STKAOEZ
 anytime = "plover"        # TPHAOEUPL, 9 keys, vs. the rules' 15-key EPB/AOE/TAOEUPL
 
-# `district` and `describe` are the one real wrinkle this pass found: `matches_real_consonants`
-# only ever checks the word's *first* syllable's onset and *last* syllable's coda, so a cluster
-# belonging to a syllable in between is invisible to it. Both words reduce their real first sound
-# (the "d" of "district"/"describe") into nothing, which happens to share a key with the next
-# syllable's own, unrelated onset cluster ("tr", "skr") — the checker mistakes that shared key for
-# a fragment of the *first* syllable's sound and drops it, when it was never attempting that sound
-# at all. `best_brief`'s own `plover` source falls for this (`district` -> `R-T`, dropping a real
-# "t" out of "tr"; `describe` -> `SREUB`, dropping a real "k" out of "skr") so both are pinned to
-# their correct, whole-cluster literal outline instead, the same way any other hand-checked literal
-# in this file is. Worth fixing in `drop_fragments`/`matches_real_consonants` itself at some point —
-# this is a narrow blind spot, not a one-off, and could be silently wrong elsewhere too.
-district = "TR-T"         # 3 keys, vs. the rules' 9-key STKREUBGT
-describe = "SKREU"        # 5 keys, vs. the rules' 12-key TKE/SKRAOEUB
+district = "plover"       # 3 keys, TR-T: see the next note for why this needs stating explicitly
+describe = "plover"       # 5 keys, SKREU
+
+# Both of the above are below this file's own `count` cutoff, so without an explicit `[word]`
+# entry neither would be considered for a brief at all (falling through to the rules' own
+# full outline — 9-key `STKREUBGT`, 12-key `TKE/SKRAOEUB`). They used to also need a literal
+# outline pinned here, not just a source: `matches_real_consonants` only checked the word's
+# *first* syllable's onset and *last* syllable's coda, so a cluster belonging to a syllable in
+# between was invisible to it. Both words reduce their real first sound (the "d" of
+# "district"/"describe") into nothing, which happens to share a key with the next syllable's own,
+# unrelated onset cluster ("tr", "skr") — the checker used to mistake that shared key for a
+# fragment of the *first* syllable's sound and drop it, when it was never attempting that sound at
+# all (`best_brief`'s own `plover` source fell for it: `district` -> `R-T`, dropping a real "t" out
+# of "tr"; `describe` -> `SREUB`, dropping a real "k" out of "skr"). Fixed at the root in
+# `Rules::explained_elsewhere` (`src/rules.rs`) — a bit already accounted for by some *other*
+# syllable's own complete onset or coda no longer counts as a fragment of the one being checked, so
+# `plover` above now reaches the correct, whole-cluster outline on its own instead of needing the
+# literal pin this used to be.
