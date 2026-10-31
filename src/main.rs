@@ -15,7 +15,6 @@ mod quote;
 mod quote_corpus;
 #[cfg(test)]
 mod quality;
-#[cfg(test)]
 mod ergonomics;
 mod reverse;
 mod rules;
