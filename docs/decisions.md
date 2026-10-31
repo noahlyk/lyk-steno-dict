@@ -147,6 +147,19 @@ line next to it showing the real answer, rather than conflating the two. **If `o
 derivation is not the same question as "what does this word actually stroke as," and both answers
 are worth keeping visible, not just one.
 
+**Spelling mode gained an encoder (`b6e1107`, `36efc64`).** It could only ever decode: `resolve`
+read a hand-written `~`/`+` letter-chord outline back into a word, but nothing went the other way
+- a word with no pronunciation at all (`stenography`, not in CMUdict) had to be spelled out by
+hand, letter by letter, against `rules/spelling.toml`, by eye, before `resolve` could even confirm
+it. `Rules::spell_word` is `resolve_spelling`'s exact inverse: given the word, it produces that
+outline directly. Wired into `quote`'s fallback chain, then into `lookup`'s `reverse_word` and
+`explain`'s no-pronunciation branch once the concurrent `lookup`/`explain` accuracy fix above
+landed and touched exactly those two functions - deliberately sequenced to avoid editing the same
+code at the same time as that fix. **Does not need porting to keymux**: keymux only ever decodes
+strokes someone actually presses (already true for spelling mode, via the generated plugin's
+letter table), it never needs to compute what to press for a word - that's purely a lyk-side
+authoring/lookup concern.
+
 ## Two rules that override any of the above
 
 These were stated repeatedly and are not up for silent renegotiation by a future change:
