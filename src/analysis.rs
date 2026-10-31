@@ -10,6 +10,91 @@ use std::collections::{BTreeMap, HashMap};
 use std::fmt::Write as _;
 use std::path::Path;
 
+/// The frequency corpus (`data/frequency/en_full.txt`) strips every apostrophe, so a contraction
+/// is counted there under its bare, misspelled form (`dont`) while CMUdict, the only source of
+/// pronunciation, keeps the real spelling (`don't`). [`Setup::load`]'s word list is built from the
+/// *intersection* of a rank and a pronunciation - `dont` has no pronunciation, `don't` has no
+/// rank - so every contraction below was silently invisible to the whole generator, no matter how
+/// common it actually is, until this table backfills `don't`'s rank from `dont`'s. Hand-curated,
+/// not derived by stripping every apostrophe CMUdict has, because most of those are unrelated
+/// possessive-noun pronunciation entries (`thing's`) that would otherwise wrongly borrow their
+/// plural twin's rank (`things`) - this list is closed-class English contractions only, verified
+/// against both files. A few (`he'll`/`hell`, `we'll`/`well`, `who're`/`whore`) share their
+/// stripped form with a real, unrelated word already at that rank; the contraction borrows an
+/// approximate rank from it rather than its own true frequency, an accepted, minor imprecision far
+/// better than being entirely absent from the dictionary. See `docs/decisions.md`.
+const CONTRACTIONS: &[(&str, &str)] = &[
+    ("aint", "ain't"),
+    ("arent", "aren't"),
+    ("cant", "can't"),
+    ("couldnt", "couldn't"),
+    ("didnt", "didn't"),
+    ("doesnt", "doesn't"),
+    ("dont", "don't"),
+    ("hadnt", "hadn't"),
+    ("hasnt", "hasn't"),
+    ("havent", "haven't"),
+    ("hed", "he'd"),
+    ("hell", "he'll"),
+    ("hes", "he's"),
+    ("heres", "here's"),
+    ("howd", "how'd"),
+    ("howre", "how're"),
+    ("hows", "how's"),
+    ("id", "i'd"),
+    ("ill", "i'll"),
+    ("im", "i'm"),
+    ("ive", "i've"),
+    ("isnt", "isn't"),
+    ("itd", "it'd"),
+    ("itll", "it'll"),
+    ("its", "it's"),
+    ("lets", "let's"),
+    ("maam", "ma'am"),
+    ("mustnt", "mustn't"),
+    ("neednt", "needn't"),
+    ("oclock", "o'clock"),
+    ("shed", "she'd"),
+    ("shell", "she'll"),
+    ("shes", "she's"),
+    ("shouldnt", "shouldn't"),
+    ("thatd", "that'd"),
+    ("thatll", "that'll"),
+    ("thats", "that's"),
+    ("thered", "there'd"),
+    ("therell", "there'll"),
+    ("therere", "there're"),
+    ("theres", "there's"),
+    ("thereve", "there've"),
+    ("theyd", "they'd"),
+    ("theyll", "they'll"),
+    ("theyre", "they're"),
+    ("theyve", "they've"),
+    ("wasnt", "wasn't"),
+    ("wed", "we'd"),
+    ("well", "we'll"),
+    ("were", "we're"),
+    ("weve", "we've"),
+    ("werent", "weren't"),
+    ("whatd", "what'd"),
+    ("whatll", "what'll"),
+    ("whatre", "what're"),
+    ("whats", "what's"),
+    ("whatve", "what've"),
+    ("whod", "who'd"),
+    ("wholl", "who'll"),
+    ("whore", "who're"),
+    ("whos", "who's"),
+    ("whove", "who've"),
+    ("wont", "won't"),
+    ("wouldnt", "wouldn't"),
+    ("yall", "y'all"),
+    ("youd", "you'd"),
+    ("youll", "you'll"),
+    ("youre", "you're"),
+    ("youve", "you've"),
+];
+
 pub struct Setup {
     pub rules: Rules,
     pub pron: Pronunciations,
@@ -47,15 +132,26 @@ impl Setup {
                 gold.join().expect("gold dictionary load panicked"),
             )
         });
+        let pron = pron?;
         let mut rank = HashMap::new();
         let mut count = HashMap::new();
         for (n, (word, times)) in frequency?.into_iter().enumerate() {
             count.entry(word.clone()).or_insert(times);
             rank.entry(word).or_insert(n);
         }
+        // See `CONTRACTIONS`: a word CMUdict has a real pronunciation for but the frequency
+        // corpus only counted under its apostrophe-stripped spelling.
+        for &(stripped, real) in CONTRACTIONS {
+            if pron.contains_key(real) && !rank.contains_key(real)
+                && let Some(&n) = rank.get(stripped)
+            {
+                count.insert(real.to_owned(), count[stripped]);
+                rank.insert(real.to_owned(), n);
+            }
+        }
         Ok(Self {
             rules,
-            pron: pron?,
+            pron,
             gold: gold?,
             rank,
             count,

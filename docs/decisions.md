@@ -160,6 +160,36 @@ strokes someone actually presses (already true for spelling mode, via the genera
 letter table), it never needs to compute what to press for a word - that's purely a lyk-side
 authoring/lookup concern.
 
+**Contractions backfilled into the frequency rank (`CONTRACTIONS` in `src/analysis.rs`).** Every
+contraction was silently invisible to the whole generator, no matter how common - `don't` has a
+real CMUdict pronunciation but was missing from the generated dictionary entirely, so striking its
+own, correct outline fell through to the raw phonetic-miss fallback and garbled it. Root cause: the
+frequency corpus strips every apostrophe (`don't` is counted there as `dont`), while CMUdict keeps
+the real spelling, and the generator's word list is built from the *intersection* of a rank and a
+pronunciation - `dont` has no pronunciation, `don't` has no rank, so neither spelling was ever both
+at once. Fixed with a hand-curated table (69 entries, verified against both files) backfilling each
+real contraction's rank from its stripped form's. **Deliberately hand-curated, not derived by
+stripping every apostrophe CMUdict has**: most of those are unrelated possessive-noun pronunciation
+entries (`thing's`) that would otherwise wrongly borrow their plural twin's rank (`things`) - this
+table is closed-class English contractions only. A few (`he'll`/`hell`, `we'll`/`well`,
+`who're`/`whore`) share their stripped spelling with a real, unrelated word already at that rank;
+the contraction borrows an approximate rank from it rather than its own true frequency - an
+accepted, minor imprecision, not a reason to revert this. **If this table shrinks or disappears,
+every contraction in it goes back to being untypeable as itself**, not just briefed differently.
+
+**`make` = `AEUBG`, dropping its own `M`, is not a bug (investigated, confirmed intentional).** One
+of Plover's own gold dictionary entries writes "make" with a bare `P` instead of the real `M` chord
+`PH`; `best_brief`/`drop_fragments` (`src/generate.rs`, `src/rules.rs`) correctly flags holding only
+*half* of `M`'s real chord as disallowed and "repairs" it by deleting the fragment entirely, same as
+it does for **113 other words**, including some of the most common in English (`the`→`-T`,
+`not`→`OT`, `that`→`A`, `for`→`-R`, `never`→`EFR`). Confirmed from the code's own doc comments this
+is the sanctioned, intended behavior, not a failure mode: "a brief is always free to leave out a
+whole sound it isn't attempting to represent." **Do not change this shared heuristic to disallow a
+full onset/coda drop** - it would silently reshuffle over a hundred already-memorized, currently-
+correct briefs for the most common words in the language. A specific word that still bothers a
+learner (`make`, say) gets a one-off `[word]` override in `rules/briefs.toml`, the normal path for
+"someone looked at this one and decided differently" - zero blast radius on the other 112.
+
 ## Two rules that override any of the above
 
 These were stated repeatedly and are not up for silent renegotiation by a future change:
