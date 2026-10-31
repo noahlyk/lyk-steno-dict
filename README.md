@@ -60,11 +60,13 @@ seen, not looked up.
 
 ## Main features
 
-- **Rule-generated, not hand-picked**: every outline but a brief comes from phonetic rules applied
-  uniformly, not chosen word by word.
-- **One outline per briefed word**: a word with a brief has exactly one way to stroke it — no
-  competing long form to also learn, and whatever that long form would have claimed is free for a
-  less common word instead.
+- **Optimized for speed, not for being guessable**: a word's single-stroke outline comes from
+  whichever source — a known brief, the phonetic rules, a brevity-ladder compression — actually
+  costs the least to type, not from a fixed rule about which words are "allowed" to be arbitrary.
+  Nothing about it needs to be derivable from the word's sound or spelling.
+- **One outline per word, always**: a word has exactly one way to stroke it — no competing long
+  form to also learn, and whatever that long form would have claimed is free for a different word
+  instead.
 - **An explicit join key**: continuation strokes are never mistaken for words, which is what lets
   suffixes be as short as a single key.
 - **Measured, not asserted**: `build` and `score` print cost and match-rate against Plover and
