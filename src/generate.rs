@@ -899,6 +899,26 @@ pub fn index(generated: &Generated) -> HashMap<String, &str> {
         .collect()
 }
 
+/// Every single-stroke word in the dictionary, by its own bare stroke — what
+/// `Rules::resolve`/the deployed plugin check before reading an unmatched run's first stroke as
+/// raw phonemes, so a continuation after a known word (`SKP/+-R`, "and" plus "-er") reads as that
+/// word's own real text ("ander") instead of garbling the word itself ("sper", "and"'s own `SKP`
+/// read as if it meant nothing). A standalone suffix's own entry is excluded the same way
+/// [`cheapest`] excludes it everywhere else — its outline is a continuation-stroke fragment, never
+/// a real word struck alone. Collision-free by construction: `taken` already guarantees one word
+/// per outline text, so there is never more than one candidate for a given stroke here.
+pub fn single_stroke_stems(generated: &Generated) -> HashMap<Stroke, String> {
+    generated
+        .entries
+        .iter()
+        .filter(|e| e.origin != Origin::Suffix)
+        .filter_map(|e| match e.outline[..] {
+            [stroke] => Some((stroke, e.word.clone())),
+            _ => None,
+        })
+        .collect()
+}
+
 /// The dictionary as Plover JSON.
 pub fn write_json(generated: &Generated, path: &Path) -> Result<()> {
     let mut map: BTreeMap<String, &str> = BTreeMap::new();

@@ -27,6 +27,18 @@ fingerspelling tables are unconditional. (A suffix struck entirely on its own, n
 is a different case: that's already its own literal dictionary entry, so `resolve` is never even
 reached for it.)
 
+**The stem half of a continuation run gets the same guarantee, from the other side.** When a run's
+*first* stroke is itself an already-placed single-stroke word, `resolve` uses that word's own real
+text instead of re-deriving it from raw phonemes. `SKP` is "and"'s own brief — nothing about those
+three keys spells "and" phonetically, so without this check `SKP/+-R` ("and" plus "-er") read back
+as "sper" (`SKP` decoded as raw onset consonants, "-er" correctly appended to the wrong stem
+entirely). `resolve` now checks an already-placed single-stroke word first, giving "ander". Ordinary
+rules-derived single-stroke words get the same treatment, not just briefs — `PWHR` ("build") plus
+`+-D` reads "builded", not "mred". This only ever applies to the *first* stroke of a run longer than
+one stroke: a single stroke that matches a placed word would already have been an ordinary
+dictionary hit, never reaching `resolve` at all. It's scoped to a single-stroke stem for now — a
+multi-stroke placed word as the stem of an unmatched run is a known, not-yet-covered extension.
+
 **A true miss** — where the rules give up outright and the engine would fall back to a raw echo
 of the keys — is only a stroke with nothing left once the star and join keys are set aside: no
 onset, no vowel, no coda, because the star and join alone carry no sound.
@@ -91,6 +103,12 @@ translator would never recognize `+` as a continuation and would treat every str
 word, even though direct dictionary lookups of an already-built multi-stroke entry (like
 `WORBG/+-G`) would still work. This is why `cargo run -- plugin` must be regenerated and
 redeployed any time `Stroke::JOIN`'s bit position changes, not just when a rule table does.
+
+It also embeds every single-stroke word currently in the dictionary (the stem table the previous
+section describes) — unlike every other table here, this one isn't a fixed theory constant, it's a
+snapshot of which word is on which single stroke right now. `cargo run -- plugin` builds the
+dictionary itself to generate this snapshot, so regenerate and redeploy whenever the *dictionary*
+changes too, not only when a rule table does.
 
 Next: **[spelling mode](spelling-mode.md)** — the same `+`-joined-run idea reused for a word with
 no pronunciation to resolve from at all.

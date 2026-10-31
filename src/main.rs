@@ -80,6 +80,13 @@ enum Command {
         /// Where to write the plugin's Rust source
         #[arg(long, default_value = "out/lyk-orthographic-fallback.rs")]
         out: PathBuf,
+        /// Words to cover when building the dictionary's single-stroke stem table, most common
+        /// first
+        #[arg(long, default_value_t = 30_000)]
+        common: usize,
+        /// Briefs to use instead of the built-in ones
+        #[arg(long)]
+        briefs: Option<PathBuf>,
     },
     /// Build the dictionary: briefs first, then the rules, and say what it costs to type
     Build {
@@ -184,7 +191,14 @@ fn main() -> Result<()> {
         } => analysis::mismatches(&setup(None)?, *syllables, *limit, *missing, *after),
         Command::Learn { min, limit } => analysis::learn(&setup(None)?, *min, *limit),
         Command::Explain { word } => analysis::explain(&setup(None)?, word),
-        Command::Plugin { out } => write_plugin(cli.rules.as_deref(), out),
+        Command::Plugin { out, common, briefs } => {
+            let setup = setup(Some(*common))?;
+            let briefs = match briefs {
+                Some(path) => generate::Briefs::load(path)?,
+                None => generate::Briefs::built_in()?,
+            };
+            write_plugin(&setup, &briefs, *common, cli.rules.as_deref(), out)
+        }
         Command::Build {
             out,
             common,
@@ -287,7 +301,7 @@ fn deploy(
     let words_out = PathBuf::from("out/lyk.json");
     generate::build(setup, briefs, common, &words_out, None)?;
     let plugin_out = PathBuf::from("out/lyk-orthographic-fallback.rs");
-    write_plugin(rules_path, &plugin_out)?;
+    write_plugin(setup, briefs, common, rules_path, &plugin_out)?;
 
     let words_to = to.join("02-lyk-words.json");
     let plugin_to = to.join("05-lyk-orthographic-fallback.rs");
@@ -382,7 +396,7 @@ fn print_resolve(
     let index = generate::index(&generated);
     if let Some(word) = index.get(&text) {
         println!("{text}  ->  {word}  (in the dictionary)");
-    } else if let Some(reading) = setup.rules.resolve(strokes) {
+    } else if let Some(reading) = setup.rules.resolve(strokes, Some(&generate::single_stroke_stems(&generated))) {
         println!("{text}  ->  {reading}  (not in the dictionary; the rules' best reading)");
     } else {
         println!("{text}  ->  no reading the rules allow: a true miss");
@@ -390,13 +404,23 @@ fn print_resolve(
     Ok(())
 }
 
-/// Generate the orthographic-fallback plugin's source and write it to `out`.
-fn write_plugin(rules_path: Option<&Path>, out: &Path) -> Result<()> {
+/// Generate the orthographic-fallback plugin's source and write it to `out`. Builds the
+/// dictionary (same `setup`/`briefs`/`common` as `build`/`deploy`) to embed its single-stroke
+/// stem table in the plugin — see [`rules::Rules::generate_plugin`].
+fn write_plugin(
+    setup: &analysis::Setup,
+    briefs: &generate::Briefs,
+    common: usize,
+    rules_path: Option<&Path>,
+    out: &Path,
+) -> Result<()> {
     let rules = match rules_path {
         Some(path) => rules::Rules::load(path)?,
         None => rules::Rules::built_in()?,
     };
-    let source = rules.generate_plugin();
+    let generated = generate::generate(setup, briefs, common)?;
+    let stems = generate::single_stroke_stems(&generated);
+    let source = rules.generate_plugin(&stems);
     if let Some(parent) = out.parent() {
         std::fs::create_dir_all(parent)?;
     }

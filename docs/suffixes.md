@@ -87,7 +87,11 @@ plugin that mirrors it) — not just as a standalone dictionary entry, but uncon
 continuation stroke that misses the dictionary entirely. `STKPW/+-D` ("z" has no dictionary entry
 at all, let alone combined with any suffix) still reads back as "zed", not "zd": the continuation
 stroke's bare chord is looked up in this table before the generic phonetic onset/vowel/coda
-read-back ever runs on it. See **[the fallback](fallback.md)** for the mechanism. The two-syllable
+read-back ever runs on it. The stem half of the same run gets the matching guarantee from the
+other side: a run's first stroke, if it's itself an already-placed single-stroke word, reads as
+that word's own real text instead of raw phonemes (`SKP/+-R`, "and" plus "-er", reads "ander" —
+without this, "and"'s own brief `SKP` would be read as meaningless raw consonants and the suffix
+appended to garbage). See **[the fallback](fallback.md)** for both mechanisms. The two-syllable
 table below isn't part of this yet, for the same reason it isn't part of the backup-entry pass
 below: a continuation is always read one stroke at a time, and a suffix that takes two strokes has
 nothing here to match against stroke-by-stroke yet.
