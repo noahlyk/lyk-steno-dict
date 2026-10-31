@@ -7,7 +7,7 @@ use crate::rules::Step;
 use crate::stroke::{Stroke, parse_outline, render_outline};
 use anyhow::{Context, Result};
 use serde::Deserialize;
-use std::collections::{BTreeMap, BinaryHeap, HashMap, HashSet};
+use std::collections::{BTreeMap, BinaryHeap, HashMap, HashSet, VecDeque};
 use std::path::Path;
 
 const BUILT_IN_BRIEFS: &str = include_str!("../rules/briefs.toml");
@@ -25,17 +25,25 @@ const RESERVED: &[(&str, &str)] = &[
     ("a fingerspelled letter or OS shortcut", include_str!("../rules/reserved/emilys-modifiers.json")),
 ];
 
-/// A brief this short was hand-picked by a theory's authors, not derived from frequency: see
-/// [`generate`].
-const TINY_BRIEF_KEYS: u32 = 2;
-
 #[derive(Deserialize, Default)]
 pub struct Briefs {
-    /// How many of the most common words get a brief
+    /// Vestigial since the solver replaced `best_brief`: every word's own gold-brief candidates
+    /// now compete on cost regardless of rank, so there is no "window" left to size (see
+    /// `enumerate_candidates`). Kept parseable so `rules/briefs.toml`'s own header does not need
+    /// editing just to stop meaning anything; `#[allow(dead_code)]` is honest about that, not a
+    /// bug to fix by wiring it back in.
+    #[allow(dead_code)]
     #[serde(default)]
     count: usize,
+    /// Vestigial for the same reason: a word with no `[word]` entry now merges *both* gold
+    /// dictionaries unconditionally (see `enumerate_candidates`'s own doc) rather than trying one
+    /// default source first.
+    #[allow(dead_code)]
     #[serde(default = "plover")]
     default: String,
+    /// Per word: a literal outline (forces exactly one candidate, never reopened to competition)
+    /// or `"plover"`/`"lapwing"` (narrows which gold dictionary this word's own brief candidates
+    /// come from, still fully competing on cost). See `enumerate_candidates`.
     #[serde(default)]
     word: HashMap<String, String>,
 }
@@ -96,6 +104,11 @@ pub struct Generated {
     /// completely unclaimed: a regression guard, not something expected to ever hold more than a
     /// handful of words (see where it is built in [`generate`]).
     pub stranded: Vec<String>,
+    /// How many words survived fixed-point peeling still holding more than one live candidate -
+    /// the real input `solve_contested` ran over. The whole algorithm choice (successive shortest
+    /// augmenting paths over this subgraph, not dense Hungarian over the full dictionary) rests on
+    /// this staying small; see `quality::the_contested_set_after_peeling_stays_small`.
+    pub contested: usize,
 }
 
 /// Among words that all share one exact pronunciation, the one whose own spelling also agrees
@@ -155,7 +168,8 @@ pub struct Candidate {
 pub fn candidate_cost(outline: &[Stroke]) -> u32 {
     const STROKE_WEIGHT: u32 = 1_000_000;
     const KEY_WEIGHT: u32 = 1_000;
-    STROKE_WEIGHT * outline.len() as u32 + KEY_WEIGHT * keys(outline) + ergonomics::weighted_outline(outline)
+    let strokes = u32::try_from(outline.len()).unwrap_or(u32::MAX);
+    STROKE_WEIGHT * strokes + KEY_WEIGHT * keys(outline) + ergonomics::weighted_outline(outline)
 }
 
 /// Every raw and drop-repaired candidate from one gold dictionary's own listed outlines for
@@ -421,6 +435,24 @@ fn solve_contested<'a>(contested: &[(&'a str, Vec<(Candidate, u64)>)]) -> HashMa
         for &(t, cost) in &word_edges[w] {
             link(&mut graph, &mut rev_of, word_node(w), text_node(t), 1, i64::try_from(cost).unwrap_or(i64::MAX));
         }
+        // A direct, private escape valve straight to the sink, bypassing every text: a genuine
+        // Hall-violation can still happen *inside* one connected component (more mutually-
+        // exclusive words sharing a text, transitively, than it has distinct texts for - a true
+        // multi-way homophone/near-homophone cluster tighter than its own star ladder can resolve,
+        // the same pre-existing "unbreakable spelling tie" edge case this project has always had).
+        // Without this, a word forced out by that only gets left unmatched by whatever the raw
+        // max-flow search happens to run out of augmenting paths on first - an arbitrary, not
+        // cost-aware choice (confirmed: it once dropped the far commoner word in a cluster while
+        // keeping rarer cluster-mates). Costing this edge at 1,000x the word's own *worst* real
+        // option keeps it always worse than any real candidate for this word specifically, and -
+        // because it still scales with this word's own edge costs, which already have its
+        // frequency weight folded in - correctly makes the solver sacrifice whichever word in a
+        // genuinely over-subscribed cluster has the least to lose, not whichever one a graph-
+        // traversal accident happened to leave out. Never actually reachable unless this word's
+        // own real candidates are every one of them already lost to someone else.
+        let worst_real = word_edges[w].iter().map(|&(_, cost)| cost).max().unwrap_or(1);
+        let no_match_cost = i64::try_from(worst_real.saturating_mul(1_000)).unwrap_or(i64::MAX);
+        link(&mut graph, &mut rev_of, word_node(w), sink, 1, no_match_cost);
     }
     for t in 0..text_count {
         link(&mut graph, &mut rev_of, text_node(t), sink, 1, 0);
@@ -486,22 +518,30 @@ fn solve_contested<'a>(contested: &[(&'a str, Vec<(Candidate, u64)>)]) -> HashMa
 
     assert_eq!(
         flow, word_count,
-        "the contested-subgraph solver failed to match every word - every word here is guaranteed \
-         at least one edge by enumeration, so this is a bug in solve_contested, not a legitimate \
-         shortfall"
+        "the contested-subgraph solver failed to saturate every word's own source edge - every \
+         word has a guaranteed path to the sink (a real candidate, or its own no-match escape \
+         valve above), so this is a bug in solve_contested, not a legitimate shortfall"
     );
+
     // The source-word edge (index 0 in each word node's own adjacency list) is always saturated
-    // and never displaced once flow is complete (see the loop above); exactly one of the
-    // candidate edges after it is the one actually carrying flow - that candidate's index in the
-    // word's own list is what `generate` asked for.
+    // and never displaced once flow is complete (see the loop above); exactly one of the edges
+    // after it is the one actually carrying flow - either a real candidate (its index in the
+    // word's own list is what `generate` asked for) or this word's own no-match escape valve
+    // (the last edge added, right after its real candidates) - a genuine Hall-violation inside
+    // this component that the escape valve's own cost-scaling chose to sacrifice. `generate`
+    // treats a word missing from the returned map as unresolved, exactly as it would have been
+    // before this solver existed.
     let mut result = HashMap::new();
     for (w, (word, _)) in contested.iter().enumerate() {
-        let candidate_index = graph[word_node(w)]
-            .iter()
-            .skip(1)
-            .position(|edge| edge.cap == 0)
-            .expect("a fully matched word has exactly one saturated candidate edge");
-        result.insert(*word, candidate_index);
+        let real_count = word_edges[w].len();
+        let matched = graph[word_node(w)].iter().skip(1).position(|edge| edge.cap == 0);
+        match matched {
+            Some(candidate_index) if candidate_index < real_count => {
+                result.insert(*word, candidate_index);
+            }
+            Some(_) => {} // the no-match escape valve won: a genuine, cost-minimal sacrifice
+            None => unreachable!("the saturation assert above guarantees every word has a match"),
+        }
     }
     result
 }
@@ -546,71 +586,6 @@ pub fn shortest(outlines: &[String]) -> Option<Vec<Stroke>> {
         .iter()
         .filter_map(|o| parse_outline(o))
         .min_by_key(|o| (o.len(), keys(o)))
-}
-
-/// Among a word's candidate outlines, the one a brief should actually use: fewest strokes, but
-/// preferring one whose first and last consonants read, under lyk's own rules, as the word's real
-/// first and last sounds, before falling back to fewest keys. Plover and Lapwing's own shortest
-/// outline for a word is sometimes their own theory's memorized one-off trick, not derived from
-/// either theory's general rules — which can mean only part of a two-key consonant is actually
-/// left in the stroke (`good`'s Plover brief `KPWAOD` drops the `T` of `TKPW`'s own `G`, `work`'s
-/// `WORB` drops the `G` of `-BG`'s own `K`). Where that happens, two repairs are tried alongside
-/// the original candidates, not just one: completing the fragment into the word's whole, correct
-/// sound (what used to be the only fallback), and dropping the fragment outright, since a brief
-/// is always free to leave out a sound it isn't attempting at all — only holding *part* of one is
-/// disallowed. Dropping is usually the fewer keys of the two, so it's what wins when it's free;
-/// both are only ever offered when the word's own gold dictionary pointed at the sound to begin
-/// with, never invented from nothing.
-fn best_brief(
-    outlines: &[String],
-    rules: &crate::rules::Rules,
-    word: &str,
-    sounds: &[String],
-    natural: &HashMap<String, &str>,
-    taken: &HashMap<String, String>,
-) -> Option<Vec<Stroke>> {
-    // Whether a candidate is one of the word's own gold outlines (never second-guessed by a
-    // collision below — a hand-picked Plover brief like "and"'s `SKP` is allowed to sit on
-    // whatever some other, unrelated word would have wanted by the plain rules; that trade is
-    // this whole mechanism's normal, accepted cost, not a bug) or this function's own synthesized
-    // drop repair (which is).
-    let mut candidates: Vec<(bool, Vec<Stroke>)> = outlines
-        .iter()
-        .filter_map(|o| parse_outline(o))
-        .flat_map(|o| {
-            let repaired = rules.drop_fragments(&o, word, sounds).map(|d| (true, d));
-            std::iter::once((false, o)).chain(repaired)
-        })
-        .collect();
-    // A *dropped* sound that happens to land exactly on a different word's own plain outline
-    // isn't a saving: it just hands that other word a ladder fight it would never otherwise have
-    // had, almost always a shorter, commoner word than the one being briefed (`fact` dropping its
-    // own `K` entirely used to take `fat`'s rightful, un-briefed `TPAT`). Only the synthesized
-    // drop candidate is checked — a raw gold outline colliding with another word is the ordinary,
-    // already-accepted case below, not this one. Checked after the key-count/fragment comparisons
-    // that matter when there's no such collision, so a candidate only pays this cost when it
-    // would otherwise have won anyway.
-    candidates.sort_by_key(|(dropped, o)| {
-        let collides = *dropped && natural.get(&render_outline(o)).is_some_and(|&owner| owner != word);
-        // Two of Plover's own gold outlines sometimes tie on every measure above (`best`'s own
-        // `PW*ES` and `PWEFT` both cost 5 keys) — a star used only as a tie-break coin flip in
-        // their own source, not for anything this word actually needs disambiguated. Preferring
-        // the star-free one when every other measure is equal costs nothing and never overrides
-        // a real win on length, fragment-safety, collision avoidance or key count above it.
-        let starred = o.iter().any(|s| s.0 & Stroke::STAR != 0);
-        (o.len(), !rules.matches_real_consonants(o, word, sounds), collides, keys(o), starred)
-    });
-    // The best candidate by that order is usually free, but not always: the commonest word to
-    // ever want an outline keeps it (that's the whole point of settling words commonest-first),
-    // so a rarer word's own top pick can already be spoken for. Rather than giving up outright —
-    // which used to mean falling all the way back to the word's full, multi-stroke phonetic
-    // outline even when its second- or third-choice brief candidate was sitting right there,
-    // untaken, and still far shorter — this tries every candidate in the same fragment-safe order
-    // and takes the first one nobody else already has.
-    candidates
-        .into_iter()
-        .map(|(_, o)| o)
-        .find(|o| !taken.contains_key(&render_outline(o)))
 }
 
 /// How many keys an outline takes to press.
@@ -724,7 +699,6 @@ pub(crate) fn reserved_outlines() -> Result<HashMap<String, String>> {
 pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generated> {
     let mut taken: HashMap<String, String> = reserved_outlines()?;
     let mut entries: Vec<Entry> = Vec::new();
-    let mut pinned: HashSet<String> = HashSet::new();
 
     // Standalone suffixes, first of all: a word that would otherwise land on the same outline
     // as one of these loses to it, the same way a brief does, since a suffix is struck on its
@@ -764,343 +738,305 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
     });
 
     // Words, most common first
-    let mut words: Vec<(&String, usize)> = setup
-        .rank
-        .iter()
-        .filter(|(w, r)| {
-            // A single letter is almost always noise in a frequency list (a stray scan
-            // artifact, a placeholder), except the two that are real English words
-            **r < common
-                && setup.pron.contains_key(w.as_str())
-                && (w.len() >= 2 || w.as_str() == "a" || w.as_str() == "i")
-                && w.bytes().all(|b| b.is_ascii_lowercase() || b == b'\'')
-        })
-        .map(|(w, r)| (w, *r))
-        .collect();
-    words.sort_by_key(|(w, r)| (*r, w.as_str()));
+    let words = ranked_words(setup, common);
 
-    // Briefs: the common words Plover or Lapwing already write, plus any word either of them
-    // writes in two keys or fewer, however rare: a brief that short was hand-picked, not derived
-    // from frequency, so frequency is not what should gate keeping it. A word named explicitly in
-    // `[word]` is a third way in, the same reasoning extended past "two keys or fewer" to "someone
-    // looked at this specific word and decided its brief was worth keeping": the frequency window
-    // is a default for words nobody has looked at individually, not a ceiling on them.
-    let has_tiny_brief = |outlines: Option<&Vec<String>>| {
-        outlines.and_then(|o| shortest(o)).is_some_and(|o| keys(&o) <= TINY_BRIEF_KEYS)
-    };
+    // The texts a one-syllable word's own plain rules would produce, and the texts *any* word's
+    // plain rules would produce - gates a brevity-ladder candidate away from an outline a learner
+    // could already work out some other word's name for (see `enumerate_candidates`).
+    let (simple, wanted) = group_outline_sets(setup, &words);
+    let simple: HashSet<&str> = simple.iter().map(String::as_str).collect();
+    let wanted: HashSet<&str> = wanted.iter().map(String::as_str).collect();
 
-    // A dry run of the brief loop below, exactly as the original algorithm picks it (no collision
-    // awareness: an empty `natural` map never flags anything as colliding), to find which words
-    // actually end up relying on their own plain outline because nothing better came of their own
-    // brief attempt. Only those words are worth a different word paying extra keys to avoid
-    // colliding with below — a word that lands a brief of its own regardless (`a`, pinned to
-    // `AEU`) never needs its plain reading (`A`) at all, so it shouldn't block some other word
-    // from cleanly dropping a sound down to that same text (see `fact`'s own drop candidate `TPAT`
-    // falsely "colliding" with `a`'s unused plain reading before this check existed).
-    let empty_natural: HashMap<String, &str> = HashMap::new();
-    let mut baseline_taken = taken.clone();
-    let mut baseline_pinned: HashSet<&str> = HashSet::new();
-    for (word, rank) in &words {
-        let plover = setup.gold.plover.get(word.as_str());
-        let lapwing = setup.gold.lapwing.get(word.as_str());
-        let named = briefs.word.contains_key(word.as_str());
-        if *rank >= briefs.count && !has_tiny_brief(plover) && !has_tiny_brief(lapwing) && !named {
-            continue;
-        }
-        let sounds = &setup.pron[word.as_str()][0];
-        let source = briefs.word.get(word.as_str()).unwrap_or(&briefs.default);
-        let outline = match source.as_str() {
-            "plover" => {
-                plover.and_then(|o| best_brief(o, &setup.rules, word, sounds, &empty_natural, &baseline_taken))
-            }
-            "lapwing" => {
-                lapwing.and_then(|o| best_brief(o, &setup.rules, word, sounds, &empty_natural, &baseline_taken))
-            }
-            explicit => parse_outline(explicit),
-        };
-        let outline = outline
-            .or_else(|| {
-                setup.gold.plover.get(word.as_str()).and_then(|o| {
-                    best_brief(o, &setup.rules, word, sounds, &empty_natural, &baseline_taken)
-                })
-            })
-            .or_else(|| {
-                setup.gold.lapwing.get(word.as_str()).and_then(|o| {
-                    best_brief(o, &setup.rules, word, sounds, &empty_natural, &baseline_taken)
-                })
-            });
-        let Some(outline) = outline else { continue };
-        let text = render_outline(&outline);
-        if baseline_taken.contains_key(&text) {
-            continue;
-        }
-        baseline_taken.insert(text, (*word).clone());
-        baseline_pinned.insert(word.as_str());
-    }
+    let mut unresolved: Vec<String> = Vec::new();
 
-    // Every common-enough word's own outline by the plain rules, so a brief below can tell a
-    // genuine saving from one that only moves a collision onto a word a learner would also know
-    // (see `best_brief`). Limited to words inside the same "commonly known" window a brief itself
-    // uses (`briefs.count`) that the dry run above shows are NOT themselves landing a brief:
-    // losing a plain outline to a brief is this whole mechanism's normal, accepted cost for a rare
-    // word (that's what the ladder is for), so only a collision with a word that actually needs
-    // this outline is worth a brief paying extra keys to avoid. The commonest word keeps a
-    // contested outline, since `words` is already sorted by rank.
-    let mut natural: HashMap<String, &str> = HashMap::new();
-    for (word, rank) in &words {
-        if *rank >= briefs.count || baseline_pinned.contains(word.as_str()) {
+    // A `[word]` literal outline in `rules/briefs.toml` forces exactly one candidate and is never
+    // reopened to competition (see `enumerate_candidates`'s own doc) - a human decision, resolved
+    // first into `taken`, the same way reserved outlines and the suffix table already are, so
+    // every other word's own candidate pool sees it as spoken for from the start. A `"plover"`/
+    // `"lapwing"` entry in `[word]` is not this: it only narrows which gold dictionary this word's
+    // own brief candidates come from, still fully competing below.
+    let is_literal_override =
+        |word: &str| briefs.word.get(word).is_some_and(|s| s != "plover" && s != "lapwing");
+    for (word, _) in &words {
+        if !is_literal_override(word.as_str()) {
             continue;
         }
-        if let Some(outline) = setup.pron[word.as_str()]
-            .iter()
-            .find_map(|sounds| setup.rules.outline(word, sounds))
-        {
-            natural.entry(render_outline(&outline)).or_insert(word.as_str());
-        }
-    }
-
-    for (word, rank) in &words {
-        let plover = setup.gold.plover.get(word.as_str());
-        let lapwing = setup.gold.lapwing.get(word.as_str());
-        let named = briefs.word.contains_key(word.as_str());
-        if *rank >= briefs.count && !has_tiny_brief(plover) && !has_tiny_brief(lapwing) && !named {
-            continue;
-        }
-        let sounds = &setup.pron[word.as_str()][0];
-        let source = briefs.word.get(word.as_str()).unwrap_or(&briefs.default);
-        let outline = match source.as_str() {
-            "plover" => plover.and_then(|o| best_brief(o, &setup.rules, word, sounds, &natural, &taken)),
-            "lapwing" => lapwing.and_then(|o| best_brief(o, &setup.rules, word, sounds, &natural, &taken)),
-            explicit => {
-                let outline = parse_outline(explicit)
-                    .with_context(|| format!("{word:?}'s brief {explicit:?} in rules/briefs.toml"))?;
-                let text = render_outline(&outline);
-                // A literal outline in `[word]` was looked at and picked by hand, unlike a
-                // `plover`/`lapwing` source's own collision-avoiding `best_brief` call above: if
-                // it's already spoken for, that is always a stale or wrong entry worth fixing in
-                // `rules/briefs.toml`, never something to fall back from silently. `up`'s own
-                // `"-P"` sat this way for a long time, unnoticed, quietly losing every build to
-                // `rules/reserved/punctuation.json`'s own `"-P"` and falling back to the
-                // two-key `UP` the rules generate anyway, with nothing printed to say so.
-                if let Some(holder) = taken.get(&text) {
-                    anyhow::bail!(
-                        "{word:?}'s brief ({explicit:?} in rules/briefs.toml) wants the outline \
-                         {text:?}, which {holder:?} already has"
-                    );
-                }
-                Some(outline)
-            }
-        };
-        // A word only one of them writes still gets its brief
-        let outline = outline
-            .or_else(|| {
-                setup
-                    .gold
-                    .plover
-                    .get(word.as_str())
-                    .and_then(|o| best_brief(o, &setup.rules, word, sounds, &natural, &taken))
-            })
-            .or_else(|| {
-                setup
-                    .gold
-                    .lapwing
-                    .get(word.as_str())
-                    .and_then(|o| best_brief(o, &setup.rules, word, sounds, &natural, &taken))
-            });
-        let Some(outline) = outline else { continue };
-        let text = render_outline(&outline);
-        if taken.contains_key(&text) {
-            continue;
+        let candidate = enumerate_candidates(setup, briefs, word.as_str(), &simple, &wanted)
+            .into_iter()
+            .next()
+            .with_context(|| format!("{word:?}'s brief in rules/briefs.toml does not parse as an outline"))?;
+        let text = render_outline(&candidate.outline);
+        if let Some(holder) = taken.get(&text) {
+            anyhow::bail!(
+                "{word:?}'s brief (in rules/briefs.toml) wants the outline {text:?}, which \
+                 {holder:?} already has"
+            );
         }
         taken.insert(text, (*word).clone());
-        pinned.insert((*word).clone());
         entries.push(Entry {
             word: (*word).clone(),
-            outline,
-            origin: Origin::Brief,
+            outline: candidate.outline,
+            origin: candidate.origin,
             lost_to: None,
         });
     }
 
-    let join = setup.rules.join_key();
-    let mut unresolved = Vec::new();
-
-    // Words that sound the same and would have the same outline: the spelling decides which one
-    // moves to its own, before frequency decides anything
-    let usual = |word: &str| {
-        setup.pron[word]
-            .iter()
-            .find_map(|sounds| setup.rules.outline(word, sounds))
-    };
-    let mut groups: HashMap<String, Vec<&str>> = HashMap::new();
+    // Every other word's own candidate pool: every legal way to write its primary outline, from
+    // every source at once (gold briefs, lyk's own rules reading, a spelling variant, brevity, the
+    // star ladder - see `enumerate_candidates`). Already-spoken-for texts are dropped and same-text
+    // candidates collapsed to the cheaper one here - the mandatory scoping step before peeling.
+    let mut remaining: HashMap<&str, Vec<Candidate>> = HashMap::new();
     for (word, _) in &words {
-        if let Some(outline) = usual(word) {
-            groups
-                .entry(render_outline(&outline))
-                .or_default()
-                .push(word.as_str());
+        if is_literal_override(word.as_str()) {
+            continue;
         }
-    }
-    // The outlines that one-syllable words have by the rules: the ones a learner would work out
-    let mut simple: HashSet<&String> = HashSet::new();
-    for (text, members) in &groups {
-        let one_syllable = |w: &&str| {
-            setup.pron[*w][0]
-                .iter()
-                .filter(|s| s.ends_with(|c: char| c.is_ascii_digit()))
-                .count()
-                == 1
-        };
-        if members.iter().any(one_syllable) {
-            simple.insert(text);
-        }
-    }
-    // The outlines some word has by the rules
-    let wanted: HashSet<&String> = groups.keys().collect();
-    let mut spelled: HashSet<String> = HashSet::new();
-    // Words whose outline another word has too, or a brief has already: the commonest first, so
-    // `heal` gets HAEL before `hale` asks for it
-    let mut clashing: Vec<&str> = groups
-        .iter()
-        .filter(|(text, members)| members.len() > 1 || taken.contains_key(text.as_str()))
-        .flat_map(|(_, members)| members.iter().copied())
-        .filter(|w| !pinned.contains(*w))
-        .collect();
-    clashing.sort_by_key(|w| (setup.rank[*w], *w));
-    {
-        for word in &clashing {
-            let Some(mut outline) = setup.pron[*word]
-                .iter()
-                .find_map(|sounds| setup.rules.variant(word, sounds))
-            else {
-                continue;
-            };
-            setup.rules.joined(&mut outline);
-            let text = render_outline(&outline);
-            if taken.contains_key(&text) || wanted.contains(&text) {
+        let candidates = enumerate_candidates(setup, briefs, word.as_str(), &simple, &wanted);
+        let mut by_text: HashMap<String, Candidate> = HashMap::new();
+        for candidate in candidates {
+            let text = render_outline(&candidate.outline);
+            if taken.contains_key(&text) {
                 continue;
             }
+            match by_text.get(&text) {
+                Some(existing) if existing.cost <= candidate.cost => {}
+                _ => {
+                    by_text.insert(text, candidate);
+                }
+            }
+        }
+        if by_text.is_empty() {
+            unresolved.push((*word).clone());
+            continue;
+        }
+        // Sorted here, by cost then by the outline's own rendered text as a deterministic
+        // tie-break: `by_text` is a `HashMap`, whose iteration order is randomized per process, so
+        // collecting it without a stable order would make which of several exactly-tied-cost
+        // candidates a word's list puts first vary run to run - harmless to the solver's own
+        // minimum-cost *value* (a true tie is a true tie either way), but this project's whole
+        // ethos is exact and reproducible, not "equally good, whichever one happened to come up."
+        let mut candidates: Vec<Candidate> = by_text.into_values().collect();
+        candidates.sort_by(|a, b| {
+            a.cost
+                .cmp(&b.cost)
+                .then_with(|| render_outline(&a.outline).cmp(&render_outline(&b.outline)))
+        });
+        remaining.insert(word.as_str(), candidates);
+    }
+
+    // Fixed-point peeling: most of the dictionary's own cheapest remaining candidate is a text
+    // nobody else currently wants most either - settling those first keeps the real solver's own
+    // input small (see `solve_contested`'s own doc for why that matters for the algorithm chosen).
+    // A word's *list length* is not the right peeling test on its own: every word with a plain
+    // rules reading always carries its own four star-ladder fallbacks too (source 5 in
+    // `enumerate_candidates`), each strictly more expensive than the word's own best pick and
+    // *never* actually wanted unless that best pick is lost to someone else - so almost every word
+    // starts with five-plus candidates regardless of whether any of them are really contested.
+    // What actually matters is each word's own *cheapest remaining* candidate: sort every list
+    // ascending by cost once, then a word is peelable the moment it is the only one whose cheapest
+    // remaining candidate renders to a given text. Settling it removes that text from every other
+    // word's list (wherever it sits, not just at the front) and tries again - a word that just lost
+    // its own former cheapest candidate this way falls through to its own next-cheapest
+    // automatically, the same star ladder it would have reached anyway, just without the solver
+    // needing to adjudicate it. Runs in rounds to a true fixed point rather than a single pass,
+    // since settling one round's uniquely-claimed texts can turn the *next*-cheapest candidate of a
+    // previously-tied word into a new, now-unique claim.
+    for candidates in remaining.values_mut() {
+        candidates.sort_by_key(|c| c.cost);
+    }
+    loop {
+        let mut top_claim: HashMap<String, Vec<&str>> = HashMap::new();
+        for (&word, candidates) in &remaining {
+            let text = render_outline(&candidates[0].outline);
+            top_claim.entry(text).or_default().push(word);
+        }
+        let resolved: Vec<(&str, String)> = top_claim
+            .into_iter()
+            .filter(|(_, claimants)| claimants.len() == 1)
+            .map(|(text, claimants)| (claimants[0], text))
+            .collect();
+        if resolved.is_empty() {
+            break;
+        }
+        for (word, _) in &resolved {
+            let candidate = remaining.remove(word).expect("resolved from remaining itself").remove(0);
+            let text = render_outline(&candidate.outline);
             taken.insert(text, (*word).to_owned());
-            spelled.insert((*word).to_owned());
             entries.push(Entry {
                 word: (*word).to_owned(),
-                outline,
-                origin: Origin::Spelling,
+                outline: candidate.outline,
+                origin: candidate.origin,
+                lost_to: None,
+            });
+        }
+        let resolved_texts: HashSet<String> = resolved.into_iter().map(|(_, text)| text).collect();
+        let mut newly_empty: Vec<&str> = Vec::new();
+        for (&word, candidates) in &mut remaining {
+            candidates.retain(|c| !resolved_texts.contains(&render_outline(&c.outline)));
+            if candidates.is_empty() {
+                newly_empty.push(word);
+            }
+        }
+        for word in newly_empty {
+            remaining.remove(word);
+            unresolved.push(word.to_owned());
+        }
+    }
+
+    // What survives peeling is the real solver's input: words still holding more than one live,
+    // still-contested candidate - checked small relative to the full dictionary by
+    // `quality::the_contested_set_after_peeling_stays_small`, the assumption the algorithm choice
+    // (successive shortest augmenting paths over this subgraph only, not dense Hungarian over
+    // everything) rests on. `edge_cost(word, candidate) = weight(word) * candidate.cost`, where
+    // `weight` is `setup.count[word]` - how many times the word was actually said in the frequency
+    // corpus, the same field `build`'s own "weighted by how often it is said" report already uses
+    // - not `common - rank`, which this plan originally specified: tried first, then reverted after
+    // it measurably cost the headline number ground (lyk losing to Plover overall, not just a small
+    // regression) by using up most of its own dynamic range on words common enough that the
+    // difference barely matters (`common - rank` for "he" at rank 17 and "heh" at rank 2,191 - a
+    // ~130x real difference in `count` - differ by under 2% once `common` is 100,000), so a rare
+    // word's own merely-somewhat-worse fallback could out-arbitrate a far commoner word's much
+    // better one purely because both words' weights were nearly indistinguishable. Raw usage count
+    // has the dynamic range frequency weighting is actually for, and headroom in `u64` for even the
+    // most extreme `count * candidate_cost` product is enormous (tens of millions times a few
+    // million is still a small fraction of `u64::MAX`), so no bound is needed here at all.
+    let contested_count = remaining.len();
+
+    // Split into connected components first (two words are connected when they share any
+    // candidate text, transitively) and solve each one separately: exact, not an approximation,
+    // since words in different components can never affect each other's optimal assignment at
+    // all, and this is what actually keeps `solve_contested`'s own input small in practice - the
+    // contested set as a whole runs well past the "hundreds to low thousands" this plan's own
+    // scale estimate assumed (the blanket `matches_real_consonants` filter's deeper fragment-drops
+    // mean a lot more words now converge on the same small handful of very short, nearly-bare
+    // outlines than a single shared-source brief pool ever produced), but it turns out to be many
+    // small, unrelated clusters rather than one giant tangle - running SSP once per cluster instead
+    // of once over everything is what makes this tractable at the real dictionary's scale.
+    // Every lookup and traversal below is sorted, not just hashed - `HashMap`/`HashSet` iteration
+    // order is randomized per process, and without this, which of several equally-sized or
+    // equally-costed outcomes a run happens to land on (component order, node numbering inside
+    // `solve_contested`, tie-broken augmenting paths) would vary run to run for no reason a learner
+    // could ever audit. Sorting words lexically here is cheap next to the solve itself and buys
+    // back the exact, reproducible behavior this project has always valued.
+    let mut text_to_words: HashMap<String, Vec<&str>> = HashMap::new();
+    for (&word, candidates) in &remaining {
+        for candidate in candidates {
+            text_to_words.entry(render_outline(&candidate.outline)).or_default().push(word);
+        }
+    }
+    for words_here in text_to_words.values_mut() {
+        words_here.sort_unstable();
+    }
+    let mut start_words: Vec<&str> = remaining.keys().copied().collect();
+    start_words.sort_unstable();
+    let mut visited: HashSet<&str> = HashSet::new();
+    let mut components: Vec<Vec<&str>> = Vec::new();
+    for start in start_words {
+        if !visited.insert(start) {
+            continue;
+        }
+        let mut queue: VecDeque<&str> = VecDeque::from([start]);
+        let mut component = vec![start];
+        while let Some(word) = queue.pop_front() {
+            for candidate in &remaining[word] {
+                let text = render_outline(&candidate.outline);
+                for &other in text_to_words.get(&text).into_iter().flatten() {
+                    if visited.insert(other) {
+                        component.push(other);
+                        queue.push_back(other);
+                    }
+                }
+            }
+        }
+        component.sort_unstable();
+        components.push(component);
+    }
+    components.sort();
+    drop(text_to_words);
+
+    for component in components {
+        let contested: Vec<(&str, Vec<(Candidate, u64)>)> = component
+            .into_iter()
+            .map(|word| {
+                let candidates = remaining.remove(word).expect("every component word is still in remaining");
+                let weight = setup.count.get(word).copied().unwrap_or(0);
+                let edges = candidates
+                    .into_iter()
+                    .map(|c| {
+                        let edge_cost = weight * u64::from(c.cost);
+                        (c, edge_cost)
+                    })
+                    .collect();
+                (word, edges)
+            })
+            .collect();
+        let assignment = solve_contested(&contested);
+        for (word, candidates) in contested {
+            // Missing only for the known, accepted Hall-violation edge case `solve_contested`'s
+            // own doc describes (more mutually-exclusive words in one connected component than it
+            // has distinct texts for, even after its own built-in "sacrifice whichever word has
+            // the least to lose" fallback) - routed to `unresolved` exactly as an unbreakable
+            // spelling tie already was before this solver existed, not silently dropped.
+            let Some(&index) = assignment.get(word) else {
+                unresolved.push(word.to_owned());
+                continue;
+            };
+            let candidate = candidates.into_iter().nth(index).expect("a valid candidate index").0;
+            let text = render_outline(&candidate.outline);
+            taken.insert(text, word.to_owned());
+            entries.push(Entry {
+                word: word.to_owned(),
+                outline: candidate.outline,
+                origin: candidate.origin,
                 lost_to: None,
             });
         }
     }
+
+    // Bonus short-form entries: after every primary is final, every `Origin::Short` candidate
+    // still free is added too - the dictionary holds every short form a learner might reach for
+    // alongside a word's own primary, and `cheapest` always picks whichever counts. Running this
+    // strictly after every primary is settled (not interleaved, as the old commonest-first loop
+    // did) closes a real ordering hazard for free: a common word's bonus short form can no longer
+    // squat on text a later, rarer word needed as its own primary, since every primary is already
+    // final by the time this runs. A literal `[word]` override keeps its one exclusive entry, the
+    // same as before.
     for (word, _) in &words {
-        if spelled.contains(word.as_str()) {
+        if is_literal_override(word.as_str()) {
             continue;
         }
-        // A word with a brief keeps it as its only entry: one outline, one way to learn it, and
-        // whatever its rule outline or short forms would have been stays free for some other
-        // word to claim instead. Words are handled once, in rank order, with `taken` checked at
-        // the moment each one claims an outline, so never claiming these on a briefed word's
-        // behalf is enough on its own for a later, less common word to pick them up as its own —
-        // no separate pass is needed.
-        if pinned.contains(word.as_str()) {
-            continue;
+        for candidate in enumerate_candidates(setup, briefs, word.as_str(), &simple, &wanted) {
+            if !matches!(candidate.origin, Origin::Short(_)) {
+                continue;
+            }
+            let text = render_outline(&candidate.outline);
+            if taken.contains_key(&text) {
+                continue;
+            }
+            taken.insert(text, (*word).clone());
+            entries.push(Entry {
+                word: (*word).clone(),
+                outline: candidate.outline,
+                origin: candidate.origin,
+                lost_to: None,
+            });
         }
-        let mut outlines: Vec<Vec<Stroke>> = Vec::new();
+    }
+
+    // Other pronunciations are only added where they clash with nothing - unchanged from before
+    // the solver existed: this only ever adds a bonus `Origin::Alternate` entry on top of a word's
+    // already-settled primary (the first pronunciation, handled above), never competes for it.
+    for (word, _) in &words {
+        let mut seen: Vec<Vec<Stroke>> = Vec::new();
         for sounds in &setup.pron[word.as_str()] {
-            if let Some(outline) = setup.rules.outline(word, sounds)
-                && !outlines.contains(&outline)
-            {
-                outlines.push(outline);
+            let Some(outline) = setup.rules.outline(word, sounds) else { continue };
+            if seen.contains(&outline) {
+                continue;
             }
-        }
-        let Some((first, others)) = outlines.split_first() else {
-            unresolved.push((*word).clone());
-            continue;
-        };
-        let mut placed = false;
-        let mut lost_to: Option<String> = None;
-        // The commonest long words go first for the fewest keys: the shortening steps, in order.
-        // Only where they save a stroke; the outline by the rules is added as well. Each short
-        // form is a group of its plain and starred forms, of which the first free one is used.
-        let mut options: Vec<(Origin, Vec<Vec<Stroke>>)> = Vec::new();
-        let own = setup.rank[word.as_str()];
-        for short in setup
-            .rules
-            .brevity()
-            .iter()
-            .filter(|s| own < s.rank && first.len() > 1)
-        {
-            for sounds in &setup.pron[word.as_str()] {
-                for outline in setup.rules.shorten(*short, word, sounds) {
-                    if outline.len() >= first.len() {
-                        continue;
-                    }
-                    // Never an outline some word has by the rules: those stay theirs. When the
-                    // form is taken, a star on it still beats a whole extra stroke.
-                    let starred: Vec<Vec<Stroke>> = ladder(&outline, join)
-                        .into_iter()
-                        .filter(|(n, _)| *n <= 2)
-                        .map(|(_, o)| o)
-                        .collect();
-                    let group: Vec<Vec<Stroke>> = std::iter::once(outline)
-                        .chain(starred)
-                        .filter(|outline| {
-                            let text = render_outline(outline);
-                            !simple.contains(&text)
-                                && !wanted.contains(&text)
-                                && !options.iter().any(|(_, g)| g.contains(outline))
-                        })
-                        .collect();
-                    if !group.is_empty() {
-                        options.push((Origin::Short(short.step), group));
-                    }
-                }
+            seen.push(outline.clone());
+            if seen.len() == 1 {
+                continue;
             }
-        }
-        options.push((Origin::Rules, vec![first.clone()]));
-        options.extend(
-            ladder(first, join)
-                .into_iter()
-                .map(|(n, o)| (Origin::Ladder(n), vec![o])),
-        );
-        for (origin, group) in options {
-            // Every short form that is free is added: the dictionary has all of a word's forms,
-            // and the cheapest counts. A rule or ladder outline settles the word.
-            if placed && !matches!(origin, Origin::Short(_)) {
-                break;
-            }
-            for mut outline in group {
-                setup.rules.joined(&mut outline);
-                let text = render_outline(&outline);
-                if let Some(holder) = taken.get(&text) {
-                    // Who has the outline the rules give this word (not one of its short forms)
-                    if origin == Origin::Rules {
-                        lost_to = Some(holder.clone());
-                    }
-                    continue;
-                }
-                taken.insert(text, (*word).clone());
-                let lost_to = if matches!(origin, Origin::Ladder(_)) {
-                    lost_to.clone()
-                } else {
-                    None
-                };
-                entries.push(Entry {
-                    word: (*word).clone(),
-                    outline,
-                    origin,
-                    lost_to,
-                });
-                if !matches!(origin, Origin::Short(_)) {
-                    placed = true;
-                }
-                break;
-            }
-        }
-        if !placed {
-            unresolved.push((*word).clone());
-        }
-        // Other pronunciations are only added where they clash with nothing
-        for outline in others {
-            let mut outline = outline.clone();
+            let mut outline = outline;
             setup.rules.joined(&mut outline);
             let text = render_outline(&outline);
             if !taken.contains_key(&text) {
@@ -1360,6 +1296,7 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
         unresolved,
         backup_skipped,
         stranded,
+        contested: contested_count,
     })
 }
 
@@ -1457,6 +1394,10 @@ pub fn build(
     println!(
         "  backup entries skipped as collisions: {}",
         generated.backup_skipped
+    );
+    println!(
+        "  words still contested after fixed-point peeling (the real solver's own input): {}",
+        generated.contested
     );
     println!(
         "  words stranded on a worse outline than their own, unclaimed plain reading: {}",
@@ -1881,6 +1822,99 @@ mod tests {
         };
         assert_eq!(text_of("d", chosen[&"d"]), "T");
         assert_eq!(text_of("e", chosen[&"e"]), "K");
+    }
+
+    #[test]
+    fn solve_contested_matches_brute_force_on_a_real_failing_case() {
+        // Exact edge costs pulled from a real build's "he"/"eh"/"heh" component: `solve_contested`
+        // was observed assigning "he" (by far the heaviest word here) its own *worst* candidate
+        // (HAOE) while "eh" and "heh" took the cheap "E"/"HE" texts "he" should have won easily -
+        // a real bug this test pins down outside the full ~100k-word build.
+        let data: &[(&str, &[(&str, u64)])] = &[
+            ("heh", &[("HE", 20_516_952_000), ("HE/+*", 41_033_904_000), ("HE/+*/+*", 61_550_856_000)]),
+            (
+                "ye",
+                &[
+                    ("HE", 10_364_688_000),
+                    ("KWRAO*E", 10_416_408_000),
+                    ("KWRAOE/+*", 20_770_752_000),
+                    ("KWRAOE/+*/+*", 31_135_440_000),
+                ],
+            ),
+            ("hedge", &[("HE", 1_780_554_000), ("HEPBLG/+*", 3_568_219_554), ("HEPBLG/+*/+*", 5_348_773_554)]),
+            (
+                "he",
+                &[
+                    ("E", 5_521_880_364_000),
+                    ("HE", 5_527_396_728_000),
+                    ("HAOE", 5_538_429_456_000),
+                    ("HAO*E", 5_543_945_820_000),
+                    ("HAOE/+*", 11_065_826_184_000),
+                    ("HAOE/+*/+*", 16_593_222_912_000),
+                ],
+            ),
+            (
+                "yee",
+                &[
+                    ("HAOE", 1_214_840_000),
+                    ("KWRAO*E", 1_218_470_000),
+                    ("KWRAOE/+*", 2_429_680_000),
+                    ("KWRAOE/+*/+*", 3_642_100_000),
+                ],
+            ),
+            ("eh", &[("E", 75_253_178_000), ("E/+*", 150_581_534_000), ("E/+*/+*", 225_909_890_000)]),
+            (
+                "edge",
+                &[
+                    ("E", 19_534_515_000),
+                    ("EPBLG", 19_612_614_030),
+                    ("EPBLG/+*", 39_166_644_030),
+                    ("EPBLG/+*/+*", 58_720_674_030),
+                ],
+            ),
+            (
+                "hee",
+                &[
+                    ("HAOE", 6_231_828_000),
+                    ("HAO*E", 6_238_035_000),
+                    ("HAOE/+*", 12_451_242_000),
+                    ("HAOE/+*/+*", 18_670_656_000),
+                ],
+            ),
+        ];
+        let contested: Vec<(&str, Vec<(Candidate, u64)>)> = data
+            .iter()
+            .map(|&(word, edges)| (word, edges.iter().map(|&(text, cost)| (candidate(text), cost)).collect()))
+            .collect();
+
+        let options: Vec<Vec<(String, u64)>> = data
+            .iter()
+            .map(|(_, edges)| edges.iter().map(|&(t, c)| (t.to_owned(), c)).collect())
+            .collect();
+        fn brute(options: &[Vec<(String, u64)>], i: usize, used: &mut Vec<String>, cost: u128, best: &mut Option<u128>) {
+            if i == options.len() {
+                *best = Some(best.map_or(cost, |b| b.min(cost)));
+                return;
+            }
+            for (t, c) in &options[i] {
+                if !used.contains(t) {
+                    used.push(t.clone());
+                    brute(options, i + 1, used, cost + u128::from(*c), best);
+                    used.pop();
+                }
+            }
+        }
+        let mut best = None;
+        brute(&options, 0, &mut Vec::new(), 0, &mut best);
+        let want = best.expect("a perfect matching exists for this graph");
+
+        let chosen = solve_contested(&contested);
+        let got: u128 = data
+            .iter()
+            .enumerate()
+            .map(|(i, _)| u128::from(options[i][chosen[data[i].0]].1))
+            .sum();
+        assert_eq!(got, want, "solver found {got}, brute force found the true optimum {want}");
     }
 
     #[test]
