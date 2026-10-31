@@ -266,3 +266,23 @@ make = "PHAEUBG"
 # the word's actual first sound. Pinned to the rules' own correct phonetic reading, which also
 # matches Lapwing exactly.
 but = "PWUT"
+
+# The four entries below trade keys for physical comfort (see src/ergonomics.rs), picked by
+# scanning the top-1,000-by-frequency words for the worst ergonomic scores and checking each one's
+# own Plover candidate list for a different-shaped answer - same mechanism as every brief above,
+# a per-word call, not a change to the shared cost function.
+
+# "against": deployed STPWEPBS (score 9) alternates onset row every finger; Plover's own second
+# candidate TKPWEPBS (score 6) swaps the leading "ST" for "TK" - same 8 keys, same stroke, no cost
+# at all, just a different onset shape Plover already lists.
+against = "TKPWEPBS"
+
+# "protect": deployed PREBGT (score 7, a sandwiched-finger gap on the left hand). Plover's own
+# "PHREBGT" (score 5) adds an "H" (7 keys instead of 6) that lets the left index cover both its own
+# rows instead of leaving the ring finger gapped between two mismatched neighbors.
+protect = "PHREBGT"
+
+# "perhaps": deployed PRAPS (score 9, the same STR/SPR-family onset cost as the structural cases
+# below, compounded by its own coda). Plover's own "PRAPGS" (score 7) adds a "G" (6 keys instead of
+# 5) and resolves a transition in the coda - a real reduction for one extra key.
+perhaps = "PRAPGS"

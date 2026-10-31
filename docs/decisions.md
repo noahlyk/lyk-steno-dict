@@ -375,6 +375,24 @@ with a sound-based one "for consistency" with the single-stroke version**, re-de
 consonant migration for every one of these suffixes first - that was the exact risk this design
 choice was made to avoid.
 
+**Three words pinned to a less-terse but more comfortable outline, the first real use of
+`src/ergonomics.rs` (`rules/briefs.toml`: `against`, `protect`, `perhaps`).** Scanned the
+top-1,000-by-frequency words for the worst `ergonomics::weighted_outline` scores, then checked each
+one's own Plover candidate list for a different-shaped answer rather than inventing anything new.
+`against` (`TKPWEPBS` vs deployed `STPWEPBS`, score 6 vs 9) cost nothing at all - same 8 keys,
+different onset shape Plover already lists. `protect` (`PHREBGT` vs `PREBGT`, score 5 vs 7) and
+`perhaps` (`PRAPGS` vs `PRAPS`, score 7 vs 9) each cost one extra key for a real reduction - the
+trade the user explicitly asked for. **A fourth candidate, `trouble` (`TRUPBL` vs `TRUBL`, score 6
+vs 8), was tried and reverted** - pinning it had no effect at all, because `trouble` also qualifies
+for the automatic brevity-ladder pass (`Origin::Short` - see the `ords`/`every short form that is
+free is added` design earlier in this log), which independently re-derives and re-claims the
+cheaper `TRUBL` regardless of any `[word]` override, and `cheapest()` always prefers the globally
+shortest entry for a word, not whichever one the brief table named. **This is a real, structural
+limit on this whole approach**: an ergonomics-motivated `[word]` override only sticks when nothing
+else in the generator independently reconstructs the word's cheaper natural form - always verify
+with `cargo run --release -- resolve -- <old outline>` that it now shows "not in the dictionary"
+before trusting an override took effect, the same check that caught this one.
+
 ## Two rules that override any of the above
 
 These were stated repeatedly and are not up for silent renegotiation by a future change:
