@@ -276,6 +276,19 @@ trace of its own first sound at all, rather than a short known brief) to be wort
 was a closed, investigated decision; this is just one of the data points it already anticipated
 getting hand-fixed individually.
 
+**`which` takes Lapwing's `KH`, not Plover's own (rejected) `WEU` (`rules/briefs.toml`:
+`which = "KH"`).** Same fragment-check mechanism as `on`/`from`/`no`/`then`/`day` above - Plover's
+own candidate `WEU` for "which" trips `matches_real_consonants` too (lyk's onset table gives a
+"wh"-spelled word the full `WH` chord, so bare `W` is only half of it) - but here the user asked
+for Lapwing's own, even shorter `KH` specifically, not a repair of Plover's rejected candidate.
+`KH` belonged to `charge` (its own Plover brief, rank ~62,700) until this override: `which` is
+roughly 300x more common (rank ~200) and simply gets processed first in the rank-ordered pass, so
+`charge` falls back automatically to its own next candidate, `KHARPBLG` - its own plain rules
+reading, which Lapwing agrees with, not an error or a downgrade worth worrying about. Confirmed
+nothing else moved. **If `which`'s override is ever removed, don't "fix" it by pointing it back at
+Plover's `WEU`** - that candidate is the one that fails the fragment check in the first place; the
+literal `"KH"` is what makes this work.
+
 ## Two rules that override any of the above
 
 These were stated repeatedly and are not up for silent renegotiation by a future change:

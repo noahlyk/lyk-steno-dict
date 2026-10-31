@@ -84,6 +84,16 @@ then = "THEB"  # coda "N" (`-PB`) missing its "P": the rules' own full reading w
 day = "TAEU"   # onset "D" (`TK`) missing its "K": reclaimed from "tae" (rank ~6,800, a far rarer
                # word only holding it by default - it falls back to its own plain reading instead)
 
+# "which" is a different shape of the same problem: Plover's own candidate "WEU" trips the same
+# fragment check too (lyk's own onset table gives a "wh"-spelled word the full "WH" chord, so bare
+# "W" is only half of it) - but here Lapwing's own, even shorter "KH" is what's wanted, not
+# Plover's "WEU". "KH" belonged to "charge" (its own Plover brief, rank ~62,700) until this line:
+# "which" is roughly 300x more common (rank ~200) and settles first purely by being processed
+# first, so "charge" falls back to its own next candidate automatically rather than erroring -
+# confirmed it lands on the still-perfectly-good, one-stroke "KHARPBLG" (its own plain rules
+# reading, which Lapwing agrees with) and nothing else moved.
+which = "KH"
+
 # "one" was checked the same way and left alone: Plover's own shortest candidate for it ("WUB")
 # hits this exact fragment rejection too, but seven lines up `one = "WUPB"` already exists as a
 # separate, deliberate decision (a homophone fight with "won" for the fully-formed outline) - not
