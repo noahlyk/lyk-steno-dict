@@ -322,6 +322,38 @@ reintroducing this exact bug, not finding a real improvement** - check `matches_
 for a bare, partial-chord Plover candidate before trusting any single-stroke win that looks too
 good, the same lesson `make` already taught once.
 
+**A physical ergonomics model, diagnostic only so far (`src/ergonomics.rs`).** Every cost
+comparison in this theory until now was pure key count - two outlines with the same number of keys
+were treated as equally good, even though some physical shapes are much harder to execute than
+others. Built from the user's own real keyboard diagram (`# +S TK PW HR AO - EU * FR PB LG TS DZ`,
+a standard steno layout, not a flat-QWERTY finger chart) and two corrections made mid-design by the
+user, both load-bearing: (1) a single finger pressing both its own rows (`TK`="D", `PW`="B") is
+*not* a penalty by itself - those are foundational, universal steno chords; the real cost is **row
+transitions** walking a hand's active fingers in physical order (`SKPH`, bottom-bottom-top-top, one
+transition, fine; `STWH`, bottom-top-bottom-top, three transitions, alternates every finger, bad) -
+and (2) the join key is excluded from the pinky-usage tax entirely, since it's a separate physical
+key present in nearly every continuation regardless of which words are involved, so taxing it would
+penalize "more than one stroke," not any real word choice. The right pinky is a real, structural
+asymmetry in the layout itself (it alone owns two columns, `T`/`S` and the further-stretch `D`/`Z`,
+where every other finger owns one) - not something any theory choice can fix, only something a cost
+model can account for.
+
+Scored the real dictionary: ergonomic cost already correlates with frequency somewhat on its own
+(top-1,000 words average 2.05, climbing to ~3.8 past 10,000) - reinforcing a trend already present,
+not fighting it. The worst offenders at every frequency band are dominated by `STR`/`SPR` onset
+clusters (`street`, `strong`, `straight`, `surprise`), which matches commonly-cited real-world
+steno complaints, not a false positive in the model. **Deliberately not wired into `cheapest`,
+`best_brief`, or any word's actual outline yet** - this is read-only and diagnostic, guarded by its
+own ceiling test (`the_real_dictionary_stays_within_known_ergonomic_ceilings`) so a future rule
+change can't silently make the dictionary physically worse to type without the test catching it,
+but no outline has been changed on ergonomic grounds alone. The next real step, not yet started: a
+one-off `[word]`-override pass on the ~20 top-1,000 words that score worst, the same safe,
+individually-verified pattern already used for `make`/`on`/`but`/`which` - not a sweeping change to
+the shared cost function. **If this module gets deleted "since it doesn't do anything yet,"** the
+next regression it would have caught (a rule change that makes a whole class of words less
+comfortable without anyone noticing, since key count alone can't see it) comes back with nothing to
+catch it.
+
 ## Two rules that override any of the above
 
 These were stated repeatedly and are not up for silent renegotiation by a future change:
