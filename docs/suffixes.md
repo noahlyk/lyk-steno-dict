@@ -98,13 +98,21 @@ This table isn't only a reference for striking a suffix on its own — a later p
 uses it, in spirit, to add a *second* dictionary entry wherever a word's own trailing syllable
 could be struck as a standalone continuation stroke and the sounds in front of it exactly match
 some other already-placed word's own pronunciation: `build`'s own outline plus `+-G` also reaches
-*building*, whether or not that agrees with *building*'s own cheapest outline. See
+*building*, whether or not that agrees with *building*'s own cheapest outline. This runs
+exhaustively and to a fixed point — every safe split is kept, not just the first, and the pass
+repeats until nothing new turns up, which is what lets a backup chain through another backup
+(*building* reaching *buildings* by adding `+-S` once *building* itself has an entry). See
 **[syllables & folding](syllables.md)** for the full rule, all three directions it runs in (this
 one, a leading-consonant prefix, and two whole words back to back — `myself` is `my` + `self`), and
 its known limits. Only **single-stroke** suffixes above take part in this — the two-syllable table
 just above (`-ism`, `-ary`/`-ery`/`-ory`, `-ical`, `-logy`, `-ity`/`-ety`, `-cy`/`-sy`,
-`-ify`/`-fy`) isn't matched by it yet, since recognising a word's last *two* syllables together as
-one of these needs its own check, not a straightforward extension of the one-syllable case.
+`-ify`/`-fy`) isn't matched by it yet: their own second syllable's onset consonant sometimes
+migrates onto the *first* suffix stroke rather than staying on the second the way plain
+syllabification would place it (`-ism`'s own `+EUZ/+-PL` ends its first stroke in the "z" that
+ordinary syllable analysis would otherwise give to the second syllable) — the same
+consonant-migration trick this page's own rule already describes once for the stem/suffix
+boundary, needing a second, deeper application here that isn't safe to guess without a worked
+derivation to check it against.
 
 ## Not yet covered
 

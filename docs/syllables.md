@@ -35,6 +35,19 @@ with *building*'s own cheapest outline above. This never changes which outline w
 primary (shown by `explain` and used everywhere else); it only ever adds an extra way in, so a
 learner who knows the stem and the ending can always reach the word that way too.
 
+**This pass is exhaustive, and runs to a fixed point.** Every word tries every split of its own
+sounds against all three directions below — not just the first one that works — and every safe,
+non-colliding composed outline it finds is added; a word regularly ends up with several backup
+entries at once, not just one. The index of "already-placed words" this searches is rebuilt after
+each pass over the whole dictionary, now including whatever the previous pass just added, and the
+whole thing repeats until a pass adds nothing new (capped at a handful of rounds as a safety net,
+not a target to hit). This is what lets a backup chain through another backup: *green* + *house*
+reaches *greenhouse* in the first pass; once *greenhouse* itself has that entry, the second pass
+finds it as an already-placed word in its own right and reaches *greenhouses* by adding `+-Z` —
+`RAOEPB/+HOUS/+-Z` — without *greenhouses* ever needing its own primary outline to be that shape.
+*in* + *still* reaching *instill*, then *instill* + `+-G` reaching *instilling*, is the same
+mechanism one level deeper.
+
 The same pass also runs the other way, for a leading sound in front of a shorter word's own
 *exact* pronunciation rather than a trailing one (`never` = the extra sound "N" in front of
 *ever*'s own exact sounds `EFR`). Since the join key only ever continues a stroke forward, this
@@ -59,8 +72,9 @@ exactly like *mice* + *elf*, a real phonetic split with no relation to the word'
 spelling at all. Spelling is the filter — only a split where the word's own spelling is the literal
 concatenation of both halves' spelling is kept (*myself* really is `"my"` + `"self"`, letter for
 letter; `"mice"` + `"elf"` isn't `"myself"`'s spelling). More than one split can still pass that bar
-at once (*outside* is genuinely both `"out"` + `"side"` and `"outs"` + `"ide"`) — the cheapest
-composed outline wins then, left alone if that's still a tie.
+at once (*outside* is genuinely both `"out"` + `"side"` and `"outs"` + `"ide"`) — both are kept, as
+separate entries, the same exhaustive "add every one that's safe" rule every direction here
+follows.
 
 This direction is more fragile than the other two, because real speech routinely reshapes a
 compound's internal boundary beyond a simple stress shift: `cannot`'s two `N`s collapse into one,

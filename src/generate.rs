@@ -121,6 +121,40 @@ fn spelled_stem<'a>(word: &str, stems: &[&'a str], boundary: fn(&str, &str) -> b
     }
 }
 
+/// One candidate composed outline from the exhaustive backup pass in [`generate`]: checked for a
+/// real fragment (the same safety net every composition kind already used before this pass was
+/// unified) and for a collision, then either added as a new [`Origin::Backup`] entry or counted
+/// in `backup_skipped`. `added_this_round` is what the fixed-point loop in `generate` watches to
+/// know when nothing further is left to find.
+#[allow(clippy::too_many_arguments)]
+fn try_add_backup(
+    setup: &Setup,
+    entries: &mut Vec<Entry>,
+    taken: &mut HashMap<String, String>,
+    backup_skipped: &mut usize,
+    added_this_round: &mut usize,
+    word: &str,
+    sounds: &[String],
+    composed: Vec<Stroke>,
+) {
+    if !setup.rules.matches_real_consonants(&composed, word, sounds) {
+        return;
+    }
+    let text = render_outline(&composed);
+    if taken.contains_key(&text) {
+        *backup_skipped += 1;
+        return;
+    }
+    taken.insert(text, word.to_owned());
+    entries.push(Entry {
+        word: word.to_owned(),
+        outline: composed,
+        origin: Origin::Backup,
+        lost_to: None,
+    });
+    *added_this_round += 1;
+}
+
 /// The shortest outline (fewest strokes, then fewest keys) from a list.
 pub fn shortest(outlines: &[String]) -> Option<Vec<Stroke>> {
     outlines
@@ -637,209 +671,195 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
         }
     }
 
-    // Backup stem+suffix entries: purely additive, and never touches a word's own outline above.
-    // For every word whose trailing syllable is a clean, reduced standalone continuation stroke
-    // (`Rules::suffix_split`), if the sounds left over exactly match one other already-placed
-    // word's own pronunciation, add a second entry built from that word's own real outline plus
-    // the continuation stroke — so a learner who knows the stem and the ending can always reach
-    // the word that way too, whether or not it agrees with the word's own cheapest outline above
-    // (`build`'s `PWEULD` plus the "-ing" stroke reaches `building`, whether or not `building`'s
-    // own cheapest outline happens to be the fused `PWEULGD`). A collision here is skipped and
-    // counted, never a hard failure, since this is a best-effort pass over the whole dictionary,
-    // not an explicit human-authored override. Run after every word above already has its final
-    // outline, so a stem is always looked up in its own already-settled form.
+    // Backup entries: exhaustive, run to a fixed point. Every round indexes everything placed so
+    // far (the primaries from the loop above in round 0, plus every earlier round's own backup
+    // entries from round 1 on) and tries every split point of every word's own sound sequence
+    // against three composition kinds — a trailing reduced-syllable suffix continuation (one or
+    // two strokes), a leading consonant cluster folded onto a placed word's first stroke, and two
+    // whole placed words back to back — adding every safe, non-colliding composed outline it
+    // finds, not just the first. A word can and does end up with more than one backup entry;
+    // that is the explicit goal here, not something to dedupe away.
+    //
+    // Chaining falls out for free from re-indexing from scratch every round: once `building` has
+    // a backup entry (round 0: `build`'s own outline plus the "-ing" stroke), round 1's rebuilt
+    // index includes it as an eligible stem the same as any primary entry, so `buildings`' own
+    // search finds `building` and continues it with "-s" — `build`/`+-G`/`+-S`, reached without
+    // `building` ever needing its own primary outline to be that shape.
+    //
     // A standalone suffix's own entry (`rules/suffixes.toml`) is a continuation-stroke shape, not
     // a real word's own outline — using one as a stem here would carry its join key onto
     // whatever gets composed from it (`ed`'s own entry is the bare continuation `+-D`, the "-ed"
-    // stroke struck on its own), so those are excluded from standing in as a stem entirely.
-    let mut word_outline: HashMap<String, Vec<Stroke>> = HashMap::new();
-    for entry in entries.iter().filter(|e| e.origin != Origin::Suffix) {
-        let cost = (entry.outline.len(), keys(&entry.outline));
-        match word_outline.get(&entry.word) {
-            Some(current) if (current.len(), keys(current)) <= cost => {}
-            _ => {
-                word_outline.insert(entry.word.clone(), entry.outline.clone());
+    // stroke struck on its own), so those are excluded from standing in as a stem entirely, every
+    // round. Collisions are skipped and counted, never a hard failure, since this is a
+    // best-effort pass over the whole dictionary, not an explicit human-authored override.
+    //
+    // Capped at a small, fixed number of rounds: growth should already have stopped well before
+    // that in practice (each round can only add entries built from the *previous* round's new
+    // stems, so the search space shrinks every round rather than compounding), and hitting the
+    // cap is worth investigating as a sign something is matching too permissively, not a reason
+    // to just raise it further.
+    const MAX_BACKUP_ROUNDS: usize = 5;
+    let mut backup_skipped = 0usize;
+    for _round in 0..MAX_BACKUP_ROUNDS {
+        let mut word_outline: HashMap<String, Vec<Stroke>> = HashMap::new();
+        for entry in entries.iter().filter(|e| e.origin != Origin::Suffix) {
+            let cost = (entry.outline.len(), keys(&entry.outline));
+            match word_outline.get(&entry.word) {
+                Some(current) if (current.len(), keys(current)) <= cost => {}
+                _ => {
+                    word_outline.insert(entry.word.clone(), entry.outline.clone());
+                }
             }
         }
-    }
-    let mut by_sounds: HashMap<&[String], Vec<&str>> = HashMap::new();
-    for word in word_outline.keys() {
-        if let Some(sounds) = setup.pron.get(word.as_str()).and_then(|prons| prons.first()) {
-            by_sounds.entry(sounds.as_slice()).or_default().push(word.as_str());
+        let mut by_sounds: HashMap<&[String], Vec<&str>> = HashMap::new();
+        // A stress-insensitive copy of the same index, for the compound direction (c) only: a
+        // word keeps its own primary stress when struck alone (`my` is `M AY1`) but a compound's
+        // own internal half often carries secondary stress instead (`myself` is `M AY2 S EH1 L
+        // F`) - the same vowel, read the same way, just not the exact token an exact phoneme
+        // match requires. Stripping the trailing stress digit the same way `syllables` already
+        // does elsewhere lets `myself` find `my` as its own first half without also loosening the
+        // suffix/prefix directions (a)/(b), which have never needed it.
+        let mut by_sounds_loose: HashMap<Vec<String>, Vec<&str>> = HashMap::new();
+        for word in word_outline.keys() {
+            if let Some(sounds) = setup.pron.get(word.as_str()).and_then(|prons| prons.first()) {
+                by_sounds.entry(sounds.as_slice()).or_default().push(word.as_str());
+                by_sounds_loose.entry(stress_stripped(sounds)).or_default().push(word.as_str());
+            }
         }
-    }
-    // A stress-insensitive copy of the same index, for the compound direction below only: a word
-    // keeps its own primary stress when struck alone (`my` is `M AY1`) but a compound's own
-    // internal half often carries secondary stress instead (`myself` is `M AY2 S EH1 L F`) - the
-    // same vowel, read the same way, just not the exact token an exact phoneme match requires.
-    // Stripping the trailing stress digit the same way `syllables` already does elsewhere lets
-    // `myself` find `my` as its own first half without also loosening the suffix/prefix
-    // directions above, which have never needed it.
-    let mut by_sounds_loose: HashMap<Vec<String>, Vec<&str>> = HashMap::new();
-    for word in word_outline.keys() {
-        if let Some(sounds) = setup.pron.get(word.as_str()).and_then(|prons| prons.first()) {
-            by_sounds_loose.entry(stress_stripped(sounds)).or_default().push(word.as_str());
-        }
-    }
-    let mut backup_skipped = 0usize;
-    for word in word_outline.keys().cloned().collect::<Vec<_>>() {
-        let Some(sounds) = setup.pron.get(&word).and_then(|prons| prons.first()) else {
-            continue;
-        };
-        let Some((split, bare)) = setup.rules.suffix_split(&word, sounds) else {
-            continue;
-        };
-        let Some(stems) = by_sounds.get(&sounds[..split]) else {
-            continue;
-        };
-        // More than one already-placed word with that exact pronunciation (`build`/`billed`):
-        // spelling breaks the tie (`building` starts with `build`, not `billed`) if it can.
-        let Some(stem) = spelled_stem(&word, stems, |w, s| w.starts_with(s)) else {
-            continue;
-        };
-        if stem == word {
-            continue;
-        }
-        let mut composed = word_outline[stem].clone();
-        composed.push(bare);
-        setup.rules.joined(&mut composed);
-        if !setup.rules.matches_real_consonants(&composed, &word, sounds) {
-            continue;
-        }
-        let text = render_outline(&composed);
-        if taken.contains_key(&text) {
-            backup_skipped += 1;
-            continue;
-        }
-        taken.insert(text, word.clone());
-        entries.push(Entry {
-            word,
-            outline: composed,
-            origin: Origin::Backup,
-            lost_to: None,
-        });
-    }
 
-    // Backup entries, prefix direction: a word's sounds ending with another already-placed
-    // word's full sounds, with one or more extra leading consonant sounds in front (`ever` ->
-    // `never`, the extra sound "N"). Composed onto the *same* stroke as the matched word's own
-    // first stroke, since lyk's join key only ever continues a stroke forward, never backward: a
-    // continuation stroke can follow a stem, but nothing can precede one. When the leading
-    // sounds' own keys overlap a key the matched word's first stroke already uses, this
-    // direction simply can't rescue the word (`unclear` needs `un-`'s own `TPH`, which shares an
-    // `H` with `clear`'s own "cl" onset cluster `KHR`) — skipped, not forced; this is a real,
-    // structural gap in the theory, not a bug in this pass.
-    for word in word_outline.keys().cloned().collect::<Vec<_>>() {
-        let Some(sounds) = setup.pron.get(&word).and_then(|prons| prons.first()) else {
-            continue;
-        };
-        let Some((split, stem)) = (1..sounds.len().min(4)).find_map(|n| {
-            let stems = by_sounds.get(&sounds[n..])?;
-            let stem = spelled_stem(&word, stems, |w, s| w.ends_with(s))?;
-            (stem != word).then_some((n, stem))
-        }) else {
-            continue;
-        };
-        let Some(leading) = setup.rules.prefix_keys(&word, sounds, split) else {
-            continue;
-        };
-        let Some(&target_first) = word_outline[stem].first() else {
-            continue;
-        };
-        if leading.0 & target_first.0 != 0 {
-            continue;
-        }
-        let mut composed = word_outline[stem].clone();
-        composed[0] = Stroke(leading.0 | target_first.0);
-        if !setup.rules.matches_real_consonants(&composed, &word, sounds) {
-            continue;
-        }
-        let text = render_outline(&composed);
-        if taken.contains_key(&text) {
-            backup_skipped += 1;
-            continue;
-        }
-        taken.insert(text, word.clone());
-        entries.push(Entry {
-            word,
-            outline: composed,
-            origin: Origin::Backup,
-            lost_to: None,
-        });
-    }
+        let mut added_this_round = 0usize;
 
-    // Backup entries, compound direction: a word's sounds splitting cleanly into two
-    // already-placed whole words' own exact pronunciations, back to back (`myself` -> `my` +
-    // `self`), composed as the first word's own outline followed by the second's, every stroke
-    // of the second marked as a join continuation exactly the way any other multi-stroke word
-    // already is. Unlike the suffix direction above, the second half doesn't have to be a
-    // *reduced* syllable at all — it's a whole word's own outline, stressed vowel and all,
-    // continuing forward the same way any word's own second stroke does.
-    //
-    // Sound alone is too loose a net here: `myself` also sounds exactly like `mice` + `elf` (a
-    // real, phonetically exact split at a different point), which is no relation to either word's
-    // own sense and nothing a learner would ever guess — unlike `doctor`/`docked`+`-er` or
-    // `crash`/`rash` above, which are at least coincidences at the word's own *real* boundary.
-    // Spelling is what tells these apart: only a split where the word's own spelling is the
-    // literal concatenation of both halves' own spelling is trusted (`myself` really is
-    // `"my"` + `"self"`, letter for letter; `"mice"` + `"elf"` isn't `"myself"`'s spelling at
-    // all). More than one split can still pass that bar at once (`outside` is genuinely both
-    // `"out"` + `"side"` and `"outs"` + `"ide"`) — the cheapest composed outline wins then, same
-    // `(strokes, keys)` order `cheapest()` already uses everywhere else; left alone, same as
-    // ever, if that's still a tie.
-    for word in word_outline.keys().cloned().collect::<Vec<_>>() {
-        let Some(sounds) = setup.pron.get(&word).and_then(|prons| prons.first()) else {
-            continue;
-        };
-        let loose = stress_stripped(sounds);
-        let mut spelled: Vec<(&str, &str)> = (1..loose.len())
-            .filter_map(|split| {
-                let firsts = by_sounds_loose.get(&loose[..split])?;
-                let seconds = by_sounds_loose.get(&loose[split..])?;
-                let first = spelled_stem(&word, firsts, |w, s| w.starts_with(s))?;
-                let second = spelled_stem(&word, seconds, |w, s| w.ends_with(s))?;
-                (first != word && second != word && word == format!("{first}{second}"))
-                    .then_some((first, second))
-            })
-            .collect();
-        // More than one split can pass the spelling-concatenation bar at once (`outside` is
-        // genuinely, literally both `"out"` + `"side"` and `"outs"` + `"ide"`): the cheapest
-        // composed outline wins, the same `(strokes, keys)` ordering `cheapest()` already uses
-        // everywhere else, since a rarer word pulled in only to complete an alternate spelling
-        // split is reliably the more expensive one. Left alone, same as ever, if that's still a
-        // tie.
-        let cost = |&(first, second): &(&str, &str)| {
-            let strokes = word_outline[first].len() + word_outline[second].len();
-            let key_count = keys(&word_outline[first]) + keys(&word_outline[second]);
-            (strokes, key_count)
-        };
-        spelled.sort_by_key(cost);
-        let chosen = match spelled[..] {
-            [] => None,
-            [one] => Some(one),
-            [best, second, ..] => (cost(&best) != cost(&second)).then_some(best),
-        };
-        let Some((first, second)) = chosen else {
-            continue;
-        };
-        let mut composed = word_outline[first].clone();
-        composed.extend(word_outline[second].iter().copied());
-        setup.rules.joined(&mut composed);
-        if !setup.rules.matches_real_consonants(&composed, &word, sounds) {
-            continue;
+        for word in word_outline.keys().cloned().collect::<Vec<_>>() {
+            let Some(sounds) = setup.pron.get(&word).and_then(|prons| prons.first()) else {
+                continue;
+            };
+
+            // (a) stem + reduced trailing-syllable suffix continuation, one stroke (`build` +
+            // "-ing" -> building; see `Rules::suffix_split`). More than one already-placed word
+            // with the exact same pronunciation (`build`/`billed`): spelling breaks the tie
+            // (`building` starts with `build`, not `billed`) if it can. The two-syllable suffixes
+            // (`-ism`, `-ary`/`-ery`/`-ory`, `-ical`, `-logy`, `-ity`/`-ety`, `-cy`/`-sy`,
+            // `-ify`/`-fy`) are deliberately NOT extended to here yet: their own second syllable's
+            // onset consonant sometimes migrates backward onto the *first* suffix stroke rather
+            // than staying on the second the way plain syllabification would place it (`-ism`'s
+            // own `+EUZ/+-PL` ends its first stroke in the "z" that `self.syllables`' ordinary
+            // onset-assignment would otherwise give to the second syllable) - the same
+            // consonant-migration trick `suffix_split`'s own doc comment already describes once,
+            // needing a second, deeper application here that isn't safe to guess without a
+            // worked derivation to check it against. See `docs/suffixes.md`.
+            if let Some((split, bare)) = setup.rules.suffix_split(&word, sounds)
+                && let Some(stems) = by_sounds.get(&sounds[..split])
+                && let Some(stem) = spelled_stem(&word, stems, |w, s| w.starts_with(s))
+                && stem != word
+            {
+                let mut composed = word_outline[stem].clone();
+                composed.push(bare);
+                setup.rules.joined(&mut composed);
+                try_add_backup(
+                    setup,
+                    &mut entries,
+                    &mut taken,
+                    &mut backup_skipped,
+                    &mut added_this_round,
+                    &word,
+                    sounds,
+                    composed,
+                );
+            }
+
+            // (b) leading consonant cluster onto a placed word's first stroke, since lyk's join
+            // key only ever continues a stroke forward, never backward: a continuation stroke can
+            // follow a stem, but nothing can precede one (`ever` -> `never`, the extra sound "N").
+            // Tries every leading length, not just the first that works. When the leading sounds'
+            // own keys overlap a key the matched word's first stroke already uses, this direction
+            // simply can't rescue the word (`unclear` needs `un-`'s own `TPH`, which shares an
+            // `H` with `clear`'s own "cl" onset cluster `KHR`) — skipped, not forced; a real,
+            // structural gap in the theory, not a bug in this pass.
+            for split in 1..sounds.len().min(4) {
+                let Some(stems) = by_sounds.get(&sounds[split..]) else {
+                    continue;
+                };
+                let Some(stem) = spelled_stem(&word, stems, |w, s| w.ends_with(s)) else {
+                    continue;
+                };
+                if stem == word {
+                    continue;
+                }
+                let Some(leading) = setup.rules.prefix_keys(&word, sounds, split) else {
+                    continue;
+                };
+                let Some(&target_first) = word_outline[stem].first() else {
+                    continue;
+                };
+                if leading.0 & target_first.0 != 0 {
+                    continue;
+                }
+                let mut composed = word_outline[stem].clone();
+                composed[0] = Stroke(leading.0 | target_first.0);
+                try_add_backup(
+                    setup,
+                    &mut entries,
+                    &mut taken,
+                    &mut backup_skipped,
+                    &mut added_this_round,
+                    &word,
+                    sounds,
+                    composed,
+                );
+            }
+
+            // (c) two whole placed words back to back (`myself` -> `my` + `self`), composed as
+            // the first word's own outline followed by the second's, every stroke of the second
+            // marked as a join continuation exactly the way any other multi-stroke word already
+            // is. Unlike (a), the second half doesn't have to be a *reduced* syllable at all —
+            // it's a whole word's own outline, stressed vowel and all.
+            //
+            // Sound alone is too loose a net here: `myself` also sounds exactly like `mice` +
+            // `elf` (a real, phonetically exact split at a different point), no relation to
+            // either word's own sense and nothing a learner would ever guess — unlike
+            // `doctor`/`docked`+`-er` or `crash`/`rash`, which are at least coincidences at the
+            // word's own *real* boundary. Spelling is what tells these apart: only a split where
+            // the word's own spelling is the literal concatenation of both halves' own spelling
+            // is trusted (`myself` really is `"my"` + `"self"`, letter for letter; `"mice"` +
+            // `"elf"` isn't `"myself"`'s spelling at all). Tries every split, adding every one
+            // that passes — `outside` is genuinely both `"out"` + `"side"` and `"outs"` + `"ide"`,
+            // and both are kept as separate entries.
+            let loose = stress_stripped(sounds);
+            for split in 1..loose.len() {
+                let Some(firsts) = by_sounds_loose.get(&loose[..split]) else {
+                    continue;
+                };
+                let Some(seconds) = by_sounds_loose.get(&loose[split..]) else {
+                    continue;
+                };
+                let Some(first) = spelled_stem(&word, firsts, |w, s| w.starts_with(s)) else {
+                    continue;
+                };
+                let Some(second) = spelled_stem(&word, seconds, |w, s| w.ends_with(s)) else {
+                    continue;
+                };
+                if first == word || second == word || word != format!("{first}{second}") {
+                    continue;
+                }
+                let mut composed = word_outline[first].clone();
+                composed.extend(word_outline[second].iter().copied());
+                setup.rules.joined(&mut composed);
+                try_add_backup(
+                    setup,
+                    &mut entries,
+                    &mut taken,
+                    &mut backup_skipped,
+                    &mut added_this_round,
+                    &word,
+                    sounds,
+                    composed,
+                );
+            }
         }
-        let text = render_outline(&composed);
-        if taken.contains_key(&text) {
-            backup_skipped += 1;
-            continue;
+
+        if added_this_round == 0 {
+            break;
         }
-        taken.insert(text, word.clone());
-        entries.push(Entry {
-            word,
-            outline: composed,
-            origin: Origin::Backup,
-            lost_to: None,
-        });
     }
 
     Ok(Generated {
