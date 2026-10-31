@@ -91,6 +91,10 @@ pub struct Generated {
     pub unresolved: Vec<String>,
     /// A backup entry (see [`Origin::Backup`]) whose composed outline another entry already had.
     pub backup_skipped: usize,
+    /// A word whose own plain-rules outline costs less than its actual entry, and is sitting
+    /// completely unclaimed: a regression guard, not something expected to ever hold more than a
+    /// handful of words (see where it is built in [`generate`]).
+    pub stranded: Vec<String>,
 }
 
 /// Among words that all share one exact pronunciation, the one whose own spelling also agrees
@@ -862,10 +866,38 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
         }
     }
 
+    // A word is stranded when its own plain-rules outline would cost less than whatever it
+    // actually settled for, and that cheaper outline's text is sitting completely unclaimed - the
+    // only way that happens today is an automatic brief that Plover or Lapwing mark with a star
+    // or an extra key for their own, unrelated reasons (see the brief loop above, which now
+    // checks for exactly this before pinning a word to one); kept here as a standing regression
+    // guard for any other way this could happen, not just that one. Checked once, against the
+    // fully-settled dictionary (after briefs, rules, the ladder, and every backup round), so it
+    // only ever reports a genuine, still-available opportunity, never a transient one that got
+    // claimed later by the word itself through some other path.
+    let stranded: Vec<String> = {
+        let best = cheapest(&entries);
+        let mut found = Vec::new();
+        for (word, outline) in &best {
+            let Some(sounds) = setup.pron.get(*word).and_then(|p| p.first()) else { continue };
+            let Some(mut natural_outline) = setup.rules.outline(word, sounds) else { continue };
+            setup.rules.joined(&mut natural_outline);
+            let text = render_outline(&natural_outline);
+            let cur_cost = (outline.len(), keys(outline));
+            let nat_cost = (natural_outline.len(), keys(&natural_outline));
+            if nat_cost < cur_cost && !taken.contains_key(&text) {
+                found.push((*word).to_owned());
+            }
+        }
+        found.sort();
+        found
+    };
+
     Ok(Generated {
         entries,
         unresolved,
         backup_skipped,
+        stranded,
     })
 }
 
@@ -964,6 +996,13 @@ pub fn build(
         "  backup entries skipped as collisions: {}",
         generated.backup_skipped
     );
+    println!(
+        "  words stranded on a worse outline than their own, unclaimed plain reading: {}",
+        generated.stranded.len()
+    );
+    if !generated.stranded.is_empty() {
+        println!("    {}", generated.stranded.join(", "));
+    }
     let sample: Vec<String> = generated
         .unresolved
         .iter()

@@ -53,6 +53,33 @@ rather than a coin flip) — a tie-break that only ever fires once every sharper
 (length, fragment-safety, collision-avoidance, keys) has already come out equal, so it can never
 turn a word away from a genuinely cheaper or safer candidate.
 
+Generation keeps a running count of words whose final outline costs more than their own
+plain-rules reading even though that reading is sitting completely free — a regression guard, not
+an auto-fix, printed by `build` as "words stranded on a worse outline than their own, unclaimed
+plain reading." This can genuinely happen: Plover and Lapwing occasionally mark a one-off
+candidate with a star, or spend an extra key, for a reason of their own theory's that has nothing
+to do with this one (`wow`'s Plover brief is `WO*U`; the exact same keys with no star, `WOU`, read
+this word just as well and cost one key less, and sat completely unclaimed). Fixing a case like
+that by hand is exactly what `[word]` in `rules/briefs.toml` is for — a one-word, looked-at-by-a-
+human override, the same mechanism already used for every other judgment call this file lists.
+
+A blanket, automatic version of that fix — "use whichever candidate is cheaper, always" — was
+tried and reverted. Two things ruled it out. First, it isn't safe to compare a brief only against
+the word's own plain-rules reading: a different pronunciation of the same written word can parse
+to something shorter with no relation to what the brief is actually for (`a`'s Plover brief
+`AEU` "lost" to a schwa-pronunciation reading of the same word that has nothing to do with the
+stressed vowel `AEU` is written for). Narrowing the comparison to only strip a candidate's *own*
+star and check if that exact text is free avoids that specific trap, but still doesn't avoid the
+second problem: this generator settles every word once, commonest-first, with nothing revisited —
+so changing even one early word's outline reshuffles which outlines are free for every word
+after it, and that reshuffle reaches much further than the word being fixed (confirmed directly:
+even the narrow, star-only version touched outlines for several hundred other words, some of them
+worse off than before, nowhere near the word it was meant to help). That ripple is this whole
+mechanism's normal, accepted cost when a *human* decides a specific word's brief should change —
+it's the same cost adding any new `[word]` entry already has — but it is not something to trigger
+automatically from a blanket rule with no one looking at what it actually moves. The regression
+guard's job is to surface candidates for that human look, not to resolve them on its own.
+
 The window itself (`count`) is a default for words nobody has looked at individually, not a
 ceiling: a word named explicitly in `[word]` gets a brief regardless of rank, the same way a
 two-key-or-fewer outline already does regardless of rank. That is only done when every one of
