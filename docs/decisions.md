@@ -354,6 +354,27 @@ next regression it would have caught (a rule change that makes a whole class of 
 comfortable without anyone noticing, since key count alone can't see it) comes back with nothing to
 catch it.
 
+**Backup generation now composes two-stroke suffixes too (`Rules::two_stroke_suffix`,
+`src/generate.rs`'s new "(a2)" composition).** The single-stroke stem+suffix backup pass
+(`Rules::suffix_split`) never covered `-ism`, `-ary`/`-ery`/`-ory`, `-ical`, `-logy`, `-cy`/`-sy`,
+`-ify`/`-fy` - a documented, deliberate deferral, since these two-syllable suffixes' own chords in
+`rules/suffixes.toml` sometimes migrate a consonant backward onto the *first* stroke in a way plain
+syllable rules wouldn't reproduce (`-ism`'s own `+EUZ/+-PL` ends its first stroke in a `z` that
+ordinary syllabification would give the second syllable instead). Rather than risk re-deriving that
+migration and getting it wrong, the fix finds the match by **spelling** instead of sound - a word
+ending in one of these suffixes' own letters (`cubism` ending in "ism") has its stem looked up by
+spelling directly (`word_outline.get("cub")`), and the suffix's own chord is reused exactly as
+written in `rules/suffixes.toml`, never re-derived. Confirmed against a real production build: 327
+new backup entries, including `cubism` → `KUB/+EUZ/+-PL`, `trilogy` → `TRAOEU/+OL/+SKWREU`,
+`chemical` → `KEPL/+-BG/+UL`, `quantify` → `KWAPBT/+U/+TPAOEU`, `salary` → `SAL/+-R/+AOE`. These are
+backups only - `cheapest()` still picks whatever's actually shortest for a word's primary entry, so
+a word that already had a cheaper single-stroke fold from an unrelated mechanism keeps it; this
+just means a stem a learner already knows now has a predictable, derivable path to these endings
+too, when nothing shorter already existed. **If spelling-based stem lookup here ever gets replaced
+with a sound-based one "for consistency" with the single-stroke version**, re-derive and verify the
+consonant migration for every one of these suffixes first - that was the exact risk this design
+choice was made to avoid.
+
 ## Two rules that override any of the above
 
 These were stated repeatedly and are not up for silent renegotiation by a future change:

@@ -747,15 +747,14 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
             // "-ing" -> building; see `Rules::suffix_split`). More than one already-placed word
             // with the exact same pronunciation (`build`/`billed`): spelling breaks the tie
             // (`building` starts with `build`, not `billed`) if it can. The two-syllable suffixes
-            // (`-ism`, `-ary`/`-ery`/`-ory`, `-ical`, `-logy`, `-ity`/`-ety`, `-cy`/`-sy`,
-            // `-ify`/`-fy`) are deliberately NOT extended to here yet: their own second syllable's
-            // onset consonant sometimes migrates backward onto the *first* suffix stroke rather
-            // than staying on the second the way plain syllabification would place it (`-ism`'s
-            // own `+EUZ/+-PL` ends its first stroke in the "z" that `self.syllables`' ordinary
-            // onset-assignment would otherwise give to the second syllable) - the same
-            // consonant-migration trick `suffix_split`'s own doc comment already describes once,
-            // needing a second, deeper application here that isn't safe to guess without a
-            // worked derivation to check it against. See `docs/suffixes.md`.
+            // (`-ism`, `-ary`/`-ery`/`-ory`, `-ical`, `-logy`, `-cy`/`-sy`, `-ify`/`-fy`) are
+            // handled separately, by (a2) below, not by extending this one: their own second
+            // syllable's onset consonant sometimes migrates backward onto the *first* suffix
+            // stroke rather than staying on the second the way plain syllabification would place
+            // it (`-ism`'s own `+EUZ/+-PL` ends its first stroke in the "z" that `self.syllables`'
+            // ordinary onset-assignment would otherwise give to the second syllable), so (a2) finds
+            // its stem by spelling and reuses `rules/suffixes.toml`'s own, already hand-verified
+            // chord as-is instead of re-deriving it through sound rules. See `docs/suffixes.md`.
             if let Some((split, bare)) = setup.rules.suffix_split(&word, sounds)
                 && let Some(stems) = by_sounds.get(&sounds[..split])
                 && let Some(stem) = spelled_stem(&word, stems, |w, s| w.starts_with(s))
@@ -774,6 +773,29 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
                     sounds,
                     composed,
                 );
+            }
+
+            // (a2) stem + a known two-stroke suffix (`-ism`, `-ary`/`-ery`/`-ory`, `-ical`,
+            // `-logy`, `-cy`/`-sy`, `-ify`/`-fy`): the gap (a)'s own comment names above. Found by
+            // spelling, not sound (see `Rules::two_stroke_suffix`'s own doc for why), so the stem
+            // is looked up by its own spelling directly rather than through `by_sounds`.
+            if let Some((suffix_text, suffix_strokes)) = setup.rules.two_stroke_suffix(&word) {
+                let stem_spelling = &word[..word.len() - suffix_text.len()];
+                if let Some(stem_outline) = word_outline.get(stem_spelling) {
+                    let mut composed = stem_outline.clone();
+                    composed.extend_from_slice(suffix_strokes);
+                    setup.rules.joined(&mut composed);
+                    try_add_backup(
+                        setup,
+                        &mut entries,
+                        &mut taken,
+                        &mut backup_skipped,
+                        &mut added_this_round,
+                        &word,
+                        sounds,
+                        composed,
+                    );
+                }
             }
 
             // (b) leading consonant cluster onto a placed word's first stroke, since lyk's join

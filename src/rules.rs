@@ -280,6 +280,11 @@ pub struct Rules {
     /// ("ed") rather than a generic phonetic guess at its bare consonants ("d") whenever it rides
     /// along after some other, unrelated stroke with no dictionary entry of its own.
     suffixes: HashMap<Stroke, String>,
+    /// `rules/suffixes.toml`'s two-stroke entries (`-ism`, `-ary`/`-ery`/`-ory`, `-ical`, `-logy`,
+    /// `-cy`/`-sy`, `-ify`/`-fy`) - each one's own spelling and its two-stroke chord, exactly as
+    /// written there. Consulted by [`Self::two_stroke_suffix`] for the backup-generation pass in
+    /// `generate.rs`, by spelling rather than re-derived sound rules (see that method's own doc).
+    two_stroke_suffixes: Vec<(String, Vec<Stroke>)>,
 }
 
 /// A table inverted: each distinct right-hand side keeps every left-hand side that produced it,
@@ -337,6 +342,23 @@ fn single_stroke_suffixes(raw: &str) -> Result<HashMap<Stroke, String>> {
         .into_iter()
         .filter_map(|(chord, text)| Stroke::parse(&chord).map(|stroke| (stroke, text)))
         .collect())
+}
+
+/// `rules/suffixes.toml`'s two-stroke entries only - the ones [`single_stroke_suffixes`] skips
+/// because their own chord has a `/` in it. Each chord is parsed whole, in order, keeping its own
+/// join bits exactly as written (both strokes already carry `+`).
+fn two_stroke_suffixes(raw: &str) -> Result<Vec<(String, Vec<Stroke>)>> {
+    let table: HashMap<String, String> = toml::from_str(raw)?;
+    table
+        .into_iter()
+        .filter(|(chord, _)| chord.contains('/'))
+        .map(|(chord, text)| {
+            let strokes: Option<Vec<Stroke>> = chord.split('/').map(Stroke::parse).collect();
+            let strokes =
+                strokes.with_context(|| format!("[suffixes] {chord:?} is not a valid two-stroke chord"))?;
+            Ok((text, strokes))
+        })
+        .collect()
 }
 
 /// A sound without its stress digit or spelling variant: `UW.oo1` is `UW`.
@@ -420,6 +442,7 @@ impl Rules {
         vowel_coda_rev.sort_by(|a, b| (&a.1, &a.2).cmp(&(&b.1, &b.2)));
         let spelling = spelling_table(BUILT_IN_SPELLING)?;
         let suffixes = single_stroke_suffixes(BUILT_IN_SUFFIXES)?;
+        let two_stroke_suffixes = two_stroke_suffixes(BUILT_IN_SUFFIXES)?;
 
         Ok(Self {
             onset,
@@ -434,6 +457,7 @@ impl Rules {
             vowel_coda_rev,
             spelling,
             suffixes,
+            two_stroke_suffixes,
             onsets: raw.syllables.onsets.into_iter().collect(),
             lax: raw.syllables.lax.into_iter().collect(),
             spelled: raw.spelled,
@@ -925,6 +949,28 @@ impl Rules {
         };
         let stroke = self.continuation(&suffix)?;
         Some((sounds.len() - 1 - last.coda.len(), stroke))
+    }
+
+    /// Whether `word` ends in one of `rules/suffixes.toml`'s two-stroke suffixes (`-ism`,
+    /// `-ary`/`-ery`/`-ory`, `-ical`, `-logy`, `-cy`/`-sy`, `-ify`/`-fy`) - found by spelling
+    /// (`word` ends with the suffix's own letters), unlike [`Self::suffix_split`]'s sound-driven
+    /// single-stroke version. That difference is deliberate, not a shortcut: a two-syllable
+    /// suffix's second syllable sometimes has its onset consonant migrate backward onto the
+    /// *first* stroke rather than staying on the second the way plain syllable rules would place
+    /// it (`-ism`'s own `+EUZ/+-PL` ends its first stroke in the `z` that ordinary onset
+    /// assignment would otherwise give the second syllable) - `rules/suffixes.toml`'s own chord is
+    /// already correct for this, hand-verified against real words, so it is reused as-is rather
+    /// than re-derived and risking getting that migration wrong. The longest matching suffix wins
+    /// when spelling matches more than one (so a word ending in both a shorter and a longer
+    /// registered suffix is read by whichever one actually describes it). `None` if nothing
+    /// matches, or a match would consume the whole word (leaving no stem).
+    #[must_use]
+    pub fn two_stroke_suffix(&self, word: &str) -> Option<(&str, &[Stroke])> {
+        self.two_stroke_suffixes
+            .iter()
+            .filter(|(text, _)| word.len() > text.len() && word.ends_with(text.as_str()))
+            .max_by_key(|(text, _)| text.len())
+            .map(|(text, strokes)| (text.as_str(), strokes.as_slice()))
     }
 
     /// The keys one or more leading consonant sounds take through the onset tables, for a prefix
@@ -1940,6 +1986,28 @@ mod tests {
         assert_eq!(write("hidden", "HH IH1 D AH0 N"), "HEUD/-PB");
         // A reduced `er` that does not fold is -R alone
         assert_eq!(write("harder", "HH AA1 R D ER0"), "HARD/-R");
+    }
+
+    #[test]
+    fn two_stroke_suffixes_are_found_by_spelling_not_sound() {
+        let rules = Rules::built_in().unwrap();
+        // "ism" is the longer, correct match over any shorter coincidental suffix spelling.
+        let (text, strokes) = rules.two_stroke_suffix("cubism").unwrap();
+        assert_eq!(text, "ism");
+        assert_eq!(render_outline(strokes), "+EUZ/+-PL");
+        // "ify" the same way.
+        let (text, strokes) = rules.two_stroke_suffix("quantify").unwrap();
+        assert_eq!(text, "ify");
+        assert_eq!(render_outline(strokes), "+U/+TPAOEU");
+        // A word that IS the suffix, with nothing left for a stem, is not a match.
+        assert!(rules.two_stroke_suffix("ism").is_none());
+        // A word that merely contains the letters, not as a true suffix match at all, still
+        // matches by spelling - this function only ever answers "could this be composed this
+        // way," `generate.rs`'s own stem lookup (does a placed word exist with this exact
+        // remaining spelling) is what actually gates whether a backup entry gets built.
+        assert!(rules.two_stroke_suffix("prism").is_some());
+        // No suffix spelling present at all.
+        assert!(rules.two_stroke_suffix("hello").is_none());
     }
 
     #[test]

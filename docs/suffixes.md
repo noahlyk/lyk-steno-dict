@@ -108,15 +108,19 @@ repeats until nothing new turns up, which is what lets a backup chain through an
 (*building* reaching *buildings* by adding `+-S` once *building* itself has an entry). See
 **[syllables & folding](syllables.md)** for the full rule, all three directions it runs in (this
 one, a leading-consonant prefix, and two whole words back to back — `myself` is `my` + `self`), and
-its known limits. Only **single-stroke** suffixes above take part in this — the two-syllable table
-just above (`-ism`, `-ary`/`-ery`/`-ory`, `-ical`, `-logy`, `-ity`/`-ety`, `-cy`/`-sy`,
-`-ify`/`-fy`) isn't matched by it yet: their own second syllable's onset consonant sometimes
-migrates onto the *first* suffix stroke rather than staying on the second the way plain
-syllabification would place it (`-ism`'s own `+EUZ/+-PL` ends its first stroke in the "z" that
-ordinary syllable analysis would otherwise give to the second syllable) — the same
-consonant-migration trick this page's own rule already describes once for the stem/suffix
-boundary, needing a second, deeper application here that isn't safe to guess without a worked
-derivation to check it against.
+its known limits. The two-syllable table above (`-ism`, `-ary`/`-ery`/`-ory`, `-ical`, `-logy`,
+`-cy`/`-sy`, `-ify`/`-fy`) takes part too, but found a different way than the single-stroke suffixes
+are: by **spelling**, not by re-deriving their sounds through syllable rules. Their own second
+syllable's onset consonant sometimes migrates onto the *first* suffix stroke rather than staying on
+the second the way plain syllabification would place it (`-ism`'s own `+EUZ/+-PL` ends its first
+stroke in the "z" that ordinary syllable analysis would otherwise give to the second syllable) —
+reliably reproducing that migration from scratch isn't safe to guess at, so instead, a word ending
+in one of this table's own suffixes (`cubism` ending in "ism") has its stem looked up by spelling
+(`cube`... here, `cub`, whatever's actually placed) rather than by sound, and the suffix's own
+already-correct two-stroke chord from this table is reused exactly as written rather than
+re-derived: `cubism` → `KUB/+EUZ/+-PL`, `trilogy` → `TRAOEU/+OL/+SKWREU`, `chemical` →
+`KEPL/+-BG/+UL`, `quantify` → `KWAPBT/+U/+TPAOEU` — all confirmed, real composed entries from a
+production build. See `Rules::two_stroke_suffix`.
 
 ## Not yet covered
 
