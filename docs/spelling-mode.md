@@ -60,6 +60,18 @@ plugin, the same way it already does for the phonetic tables (see
 [fallback.md](fallback.md#keeping-the-plugin-honest)) — nothing about spelling mode is a
 second, hand-maintained copy of this rule either.
 
+## Going the other way: `Rules::spell_word`
+
+Everything above reads a spelling-mode outline back into a word — useful once you already know
+you're going to spell something out, but no help deciding *how* to spell it: hand-writing
+`~S/+T/+E/+TPH/+O/+TKPW/+R/+A/+P/+H/+KWH` for `stenography` letter by letter, by eye, against
+`rules/spelling.toml`, isn't something a learner should have to do. `Rules::spell_word` is the
+exact inverse of `resolve_spelling`: given the word, it looks each letter up in the same table and
+produces that same outline directly, `~` on the first stroke and `+` on every one after it — `None`
+for any word with a character the table has no chord for (anything outside plain a-z). This is what
+a lookup tool should fall back to once a word has no pronunciation at all for the phonetic rules to
+run from, rather than reporting the word as simply untypeable.
+
 ## Not yet wired to a physical key
 
 Unlike the join key, `~` has no physical key bound to it in the live keymux config yet. keymux's

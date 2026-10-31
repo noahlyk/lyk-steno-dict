@@ -1332,6 +1332,23 @@ impl Rules {
         Some(text)
     }
 
+    /// The reverse of [`Self::resolve_spelling`]: a word written out as its own spelling-mode
+    /// outline, one letter-chord stroke per character, the first marked `Stroke::SPELL` and every
+    /// one after it `Stroke::JOIN` like any other continuation. `None` for a word with any
+    /// character `rules/spelling.toml` has no chord for (anything outside plain a-z) — the same
+    /// condition that makes a word untypeable by spelling mode at all.
+    pub fn spell_word(&self, word: &str) -> Option<Vec<Stroke>> {
+        word.chars()
+            .enumerate()
+            .map(|(i, ch)| {
+                let letter = ch.to_lowercase().next()?.to_string();
+                let (&bits, _) = self.spelling.iter().find(|(_, l)| **l == letter)?;
+                let marker = if i == 0 { Stroke::SPELL } else { Stroke::JOIN };
+                Some(Stroke(bits.0 | marker))
+            })
+            .collect()
+    }
+
     /// The best reading the rules can give a stroke outline: each stroke's sounds, read back
     /// and spelled plainly (not real orthography, just enough to read), continuation strokes
     /// run on and others started with a space. `None` only once some stroke in it cannot be
@@ -1958,6 +1975,21 @@ mod tests {
         );
         // A chord with no entry in rules/spelling.toml is a true miss, same as any other.
         assert_eq!(read("~*"), None);
+    }
+
+    #[test]
+    fn spell_word_is_resolve_spellings_exact_inverse() {
+        let rules = Rules::built_in().unwrap();
+        // The encode direction: given just the word, not a stroke sequence someone already wrote
+        // out by hand, produce the same outline `docs/spelling-mode.md` hand-writes for
+        // "stenography" - a word with no pronunciation at all for the phonetic rules to run from.
+        let outline = rules.spell_word("stenography").unwrap();
+        assert_eq!(render_outline(&outline), "~S/+T/+E/+TPH/+O/+TKPW/+R/+A/+P/+H/+KWH");
+        // Round-trips back through the decode direction exactly.
+        assert_eq!(rules.resolve(&outline, None), Some("stenography".to_owned()));
+        // A character spelling mode has no chord for (anything but a-z) is a true miss, same as
+        // a stroke chord with no entry in the table.
+        assert_eq!(rules.spell_word("o'clock"), None);
     }
 
     #[test]
