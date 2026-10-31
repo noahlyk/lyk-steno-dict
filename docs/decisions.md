@@ -393,23 +393,61 @@ else in the generator independently reconstructs the word's cheaper natural form
 with `cargo run --release -- resolve -- <old outline>` that it now shows "not in the dictionary"
 before trusting an override took effect, the same check that caught this one.
 
-## Two rules that override any of the above
+## The core philosophy reversed (day 4): speed over per-word learnability
 
-These were stated repeatedly and are not up for silent renegotiation by a future change:
+**This is a genuine, deliberate reversal of this project's original founding value, not an
+incremental tweak — recorded here so nobody mistakes it for drift.** Every entry above this line
+was written under the original rule: "a learner can read a finite rule and predict a stroke,"
+applied to *every* word, which is why so many entries above justify an arbitrary brief as an
+exception scoped to short, extremely common words only (`into`, `will`, `under`, `and`) while
+treating rules-derived predictability as the default everywhere else. The user explicitly revoked
+that default after reflecting on it directly: *"I want some balance, I get that rare words may need
+to be learnable but we are making too many words 'easily learnable'... full speed everywhere is my
+new ideology. break all of my old rules... we can always build multistroke phonetic fallbacks with
+our + join key."*
+
+**What this actually means, precisely** — because "full speed" alone is too vague to build against:
+- A word's **primary, cheapest outline no longer needs any individual phonetic or spelling
+  justification at all**, for any word, not just common ones. If a shorter or more ergonomic
+  outline exists for a rare, multi-stroke word by any legitimate means (a gold-dictionary brief,
+  brevity-ladder compression, a globally-optimized reassignment), it should be taken, even if
+  nothing about the result is guessable from the word's sound or spelling.
+- **The safety net stays, and is the reason this reversal is viable rather than reckless**: the
+  `+`-joined, phonetically-derived multi-stroke fallback (the whole `docs/fallback.md` mechanism,
+  `Rules::resolve`, the deployed plugin) is explicitly *not* going anywhere. A learner who forgets
+  or never learned a word's optimized brief can still compose it sound-by-sound, slower, exactly as
+  today. Speed optimization only ever applies to what counts as the *best* outline a real dictionary
+  hands out; it never removes the ability to spell a word out by sound as a fallback of last resort.
+- This directly motivates treating dictionary generation as a **global optimization problem**
+  (assign every word its cheapest-available outline across the whole dictionary at once, not
+  commonest-word-first-greedy-never-revisit) rather than a predictability-constrained rules engine
+  with hand-picked exceptions - see the live discussion for the specific plan (an exact min-cost
+  bipartite assignment over per-word candidates now, local-search refinement for cross-word costs
+  like phrase-briefing and inter-stroke ergonomics later). That work is in progress as of this
+  entry; treat any claim elsewhere in this doc that a word "should" look guessable as **historical
+  record of a now-superseded default**, not a constraint binding future changes.
+
+## The one rule that still overrides everything above
+
+This was stated repeatedly and remains non-negotiable - speed-over-learnability does not touch it,
+because it isn't about learnability at all, it's about correctness of method:
 
 **No semantic, fuzzy, or embedding-based matching anywhere in dictionary generation.** Only exact
-phonetic containment (is one word's pronunciation exactly a prefix/suffix of another's) and exact
-spelling-boundary tie-breaks. Phonetic containment has a symbolic ground truth already sitting in
-the pronunciation data — there's nothing to approximate, so a learned similarity score would only
-add a miscalibrated threshold and a new source of false positives that exact matching can't
-produce by construction. It would also break the project's central requirement, that a learner can
-read a finite rule and predict a stroke: "related because this exact sound sequence matches" is
-checkable by eye forever; "related because a trained vector's similarity exceeded some cutoff" is
-neither learnable nor stable. If a future change wants embeddings or cosine similarity for
-*anything* in this pipeline, that is a reversal of an explicit, considered decision, not a neutral
-addition — raise it as one.
+phonetic containment (is one word's pronunciation exactly a prefix/suffix of another's), exact
+spelling-boundary tie-breaks, and exact, auditable cost functions (key count, the ergonomics score,
+frequency weight) - including inside any future optimizer. Phonetic containment has a symbolic
+ground truth already sitting in the pronunciation data — there's nothing to approximate, so a
+learned similarity score would only add a miscalibrated threshold and a new source of false
+positives that exact matching can't produce by construction. A global optimizer is not an exception
+to this rule: minimizing an exact, readable cost function over a finite candidate set is still exact
+computation, not a learned approximation — there is no gradient, no training data, and no model
+whose internal weights replace an auditable reason. If a future change wants embeddings, cosine
+similarity, or a trained model deciding *which outline a word gets* for *anything* in this pipeline,
+that is a reversal of an explicit, considered decision, not a neutral addition — raise it as one.
 
-**Exactly one single-stroke outline per word; unlimited, predictable `+`-joined multi-stroke
-backups.** Restated here because it's the invariant every backup-generation decision above exists
-to protect without ever touching. See the one-stroke-per-word entry above and
+**The structural one-stroke-per-word policy itself is unaffected by the philosophy reversal above**
+— every word still gets exactly one primary single-stroke outline, with unlimited `+`-joined
+multi-stroke backups available underneath it. What changed is *how arbitrary that one primary
+outline is allowed to be*, not whether the one-outline/many-backups shape exists at all. See the
+one-stroke-per-word entry above and
 [the table of contents](README.md)'s own opening paragraph for the canonical wording.
