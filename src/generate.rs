@@ -70,10 +70,11 @@ pub enum Origin {
     Alternate,
     /// The ladder step that settled a clash: 1 is the star on the first stroke
     Ladder(u8),
-    /// An already-placed shorter word's own outline, plus a bare continuation stroke for
-    /// whatever trailing sounds are left over — struck on top of however the word is actually
-    /// briefed or folded, so a learner who knows the stem and the ending can always reach the
-    /// word that way too (see the backup-entry pass in [`generate`]).
+    /// Composed from one or two already-placed words' own outlines: a stem plus a bare
+    /// continuation stroke for a reduced trailing syllable, a leading consonant folded onto
+    /// another word's first stroke, or two whole words back to back — struck on top of however
+    /// each piece is actually briefed or folded, so a learner who knows the pieces can always
+    /// reach the word that way too (see the backup-entry pass in [`generate`]).
     Backup,
 }
 
@@ -99,6 +100,14 @@ pub struct Generated {
 /// `docs/spelling.md`). Sound is still what found these candidates in the first place; spelling
 /// only ever narrows a tie between them, never widens the search. `None` if nobody's spelling
 /// agrees, or if more than one still does.
+/// `sounds`, with each token's trailing stress digit removed — the same trimming
+/// `Rules::syllables` already does to tell a vowel from a consonant, reused here so a word's own
+/// primary-stress pronunciation can still match its secondary-stress form inside a compound
+/// (`my`'s own `M AY1` against `myself`'s own `M AY2 ...`).
+fn stress_stripped(sounds: &[String]) -> Vec<String> {
+    sounds.iter().map(|s| s.trim_end_matches(|c: char| c.is_ascii_digit()).to_owned()).collect()
+}
+
 fn spelled_stem<'a>(word: &str, stems: &[&'a str], boundary: fn(&str, &str) -> bool) -> Option<&'a str> {
     match *stems {
         [stem] => Some(stem),
@@ -659,6 +668,19 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
             by_sounds.entry(sounds.as_slice()).or_default().push(word.as_str());
         }
     }
+    // A stress-insensitive copy of the same index, for the compound direction below only: a word
+    // keeps its own primary stress when struck alone (`my` is `M AY1`) but a compound's own
+    // internal half often carries secondary stress instead (`myself` is `M AY2 S EH1 L F`) - the
+    // same vowel, read the same way, just not the exact token an exact phoneme match requires.
+    // Stripping the trailing stress digit the same way `syllables` already does elsewhere lets
+    // `myself` find `my` as its own first half without also loosening the suffix/prefix
+    // directions above, which have never needed it.
+    let mut by_sounds_loose: HashMap<Vec<String>, Vec<&str>> = HashMap::new();
+    for word in word_outline.keys() {
+        if let Some(sounds) = setup.pron.get(word.as_str()).and_then(|prons| prons.first()) {
+            by_sounds_loose.entry(stress_stripped(sounds)).or_default().push(word.as_str());
+        }
+    }
     let mut backup_skipped = 0usize;
     for word in word_outline.keys().cloned().collect::<Vec<_>>() {
         let Some(sounds) = setup.pron.get(&word).and_then(|prons| prons.first()) else {
@@ -729,6 +751,80 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
         }
         let mut composed = word_outline[stem].clone();
         composed[0] = Stroke(leading.0 | target_first.0);
+        if !setup.rules.matches_real_consonants(&composed, &word, sounds) {
+            continue;
+        }
+        let text = render_outline(&composed);
+        if taken.contains_key(&text) {
+            backup_skipped += 1;
+            continue;
+        }
+        taken.insert(text, word.clone());
+        entries.push(Entry {
+            word,
+            outline: composed,
+            origin: Origin::Backup,
+            lost_to: None,
+        });
+    }
+
+    // Backup entries, compound direction: a word's sounds splitting cleanly into two
+    // already-placed whole words' own exact pronunciations, back to back (`myself` -> `my` +
+    // `self`), composed as the first word's own outline followed by the second's, every stroke
+    // of the second marked as a join continuation exactly the way any other multi-stroke word
+    // already is. Unlike the suffix direction above, the second half doesn't have to be a
+    // *reduced* syllable at all — it's a whole word's own outline, stressed vowel and all,
+    // continuing forward the same way any word's own second stroke does.
+    //
+    // Sound alone is too loose a net here: `myself` also sounds exactly like `mice` + `elf` (a
+    // real, phonetically exact split at a different point), which is no relation to either word's
+    // own sense and nothing a learner would ever guess — unlike `doctor`/`docked`+`-er` or
+    // `crash`/`rash` above, which are at least coincidences at the word's own *real* boundary.
+    // Spelling is what tells these apart: only a split where the word's own spelling is the
+    // literal concatenation of both halves' own spelling is trusted (`myself` really is
+    // `"my"` + `"self"`, letter for letter; `"mice"` + `"elf"` isn't `"myself"`'s spelling at
+    // all). More than one split can still pass that bar at once (`outside` is genuinely both
+    // `"out"` + `"side"` and `"outs"` + `"ide"`) — the cheapest composed outline wins then, same
+    // `(strokes, keys)` order `cheapest()` already uses everywhere else; left alone, same as
+    // ever, if that's still a tie.
+    for word in word_outline.keys().cloned().collect::<Vec<_>>() {
+        let Some(sounds) = setup.pron.get(&word).and_then(|prons| prons.first()) else {
+            continue;
+        };
+        let loose = stress_stripped(sounds);
+        let mut spelled: Vec<(&str, &str)> = (1..loose.len())
+            .filter_map(|split| {
+                let firsts = by_sounds_loose.get(&loose[..split])?;
+                let seconds = by_sounds_loose.get(&loose[split..])?;
+                let first = spelled_stem(&word, firsts, |w, s| w.starts_with(s))?;
+                let second = spelled_stem(&word, seconds, |w, s| w.ends_with(s))?;
+                (first != word && second != word && word == format!("{first}{second}"))
+                    .then_some((first, second))
+            })
+            .collect();
+        // More than one split can pass the spelling-concatenation bar at once (`outside` is
+        // genuinely, literally both `"out"` + `"side"` and `"outs"` + `"ide"`): the cheapest
+        // composed outline wins, the same `(strokes, keys)` ordering `cheapest()` already uses
+        // everywhere else, since a rarer word pulled in only to complete an alternate spelling
+        // split is reliably the more expensive one. Left alone, same as ever, if that's still a
+        // tie.
+        let cost = |&(first, second): &(&str, &str)| {
+            let strokes = word_outline[first].len() + word_outline[second].len();
+            let key_count = keys(&word_outline[first]) + keys(&word_outline[second]);
+            (strokes, key_count)
+        };
+        spelled.sort_by_key(cost);
+        let chosen = match spelled[..] {
+            [] => None,
+            [one] => Some(one),
+            [best, second, ..] => (cost(&best) != cost(&second)).then_some(best),
+        };
+        let Some((first, second)) = chosen else {
+            continue;
+        };
+        let mut composed = word_outline[first].clone();
+        composed.extend(word_outline[second].iter().copied());
+        setup.rules.joined(&mut composed);
         if !setup.rules.matches_real_consonants(&composed, &word, sounds) {
             continue;
         }

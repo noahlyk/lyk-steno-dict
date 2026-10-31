@@ -45,13 +45,38 @@ stroke already uses, this can't rescue the word at all (`unclear` needs `un-`'s 
 shares an `H` with *clear*'s own "cl" onset cluster `KHR`) — skipped, not forced, a real structural
 limit of a theory where nothing can precede a stroke, only follow one.
 
-Neither direction requires the match to *mean* anything: `doctor`'s own sounds happen to be exactly
-`docked`'s plus an "-er", and `crash`'s are exactly a "k" in front of `rash`'s — coincidences with
-no relation to either word's own sense, reused anyway, the same way a brief never needed one either
-(see [the main README](../README.md#where-lyk-stands)). When more than one already-placed word
-ties on sound alone (`build` and `billed` are exact homophones), the word's own *spelling* breaks
-the tie if it can — `building` starts with `build`, not `billed` — the same way spelling already
-settles a tie between words that sound alike elsewhere in this theory (see
+**A third direction: two whole words back to back.** Neither of the above fits a word like
+*myself* — *self* isn't a reduced syllable (`suffix_split` never fires), and there's no leading
+sound left over once *self*'s own exact sounds are accounted for (the prefix direction has
+nothing to attach). What *myself* actually is, is two already-placed whole words, each keeping its
+own full outline: *my*'s `PHEU` followed by *self*'s own `SEFL`, every stroke of *self* marked as a
+join continuation the same way any multi-stroke word's second stroke already is — `PHEU/+SEFL`.
+This pass tries every split of a word's sounds and keeps the ones where an already-placed word
+exactly accounts for each half (ignoring stress — a word often carries secondary stress inside a
+compound that it keeps as primary stress alone, *myself* is `M AY2 S EH1 L F` but *my* alone is
+`M AY1`). Sound alone finds too many candidates to trust on its own, though: *myself* also sounds
+exactly like *mice* + *elf*, a real phonetic split with no relation to the word's own meaning or
+spelling at all. Spelling is the filter — only a split where the word's own spelling is the literal
+concatenation of both halves' spelling is kept (*myself* really is `"my"` + `"self"`, letter for
+letter; `"mice"` + `"elf"` isn't `"myself"`'s spelling). More than one split can still pass that bar
+at once (*outside* is genuinely both `"out"` + `"side"` and `"outs"` + `"ide"`) — the cheapest
+composed outline wins then, left alone if that's still a tie.
+
+This direction is more fragile than the other two, because real speech routinely reshapes a
+compound's internal boundary beyond a simple stress shift: `cannot`'s two `N`s collapse into one,
+`yourself`'s `"your"` reduces from `Y AO1 R` to a single `ER0`, `anybody`'s `"body"` loses its
+stressed vowel entirely. None of that is a stress-only difference an exact-phoneme match (even a
+stress-blind one) can see past, so these are correctly left alone rather than guessed at — a real,
+accepted gap, not a bug to chase. `everyone`, `yourself`, `cannot`, and `anybody` all miss this way
+today.
+
+None of these three directions requires the match to *mean* anything: `doctor`'s own sounds happen
+to be exactly `docked`'s plus an "-er", and `crash`'s are exactly a "k" in front of `rash`'s —
+coincidences with no relation to either word's own sense, reused anyway, the same way a brief never
+needed one either (see [the main README](../README.md#where-lyk-stands)). When more than one
+already-placed word ties on sound alone (`build` and `billed` are exact homophones), the word's own
+*spelling* breaks the tie if it can — `building` starts with `build`, not `billed` — the same way
+spelling already settles a tie between words that sound alike elsewhere in this theory (see
 [spelling disambiguation](spelling.md)); if spelling doesn't settle it either, the word is left
 alone rather than guessed at. A collision with an outline something else already has is skipped and
 counted (`build`'s own report line), never a hard failure, since this is a best-effort pass over

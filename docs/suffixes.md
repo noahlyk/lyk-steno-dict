@@ -87,8 +87,9 @@ uses it, in spirit, to add a *second* dictionary entry wherever a word's own tra
 could be struck as a standalone continuation stroke and the sounds in front of it exactly match
 some other already-placed word's own pronunciation: `build`'s own outline plus `+-G` also reaches
 *building*, whether or not that agrees with *building*'s own cheapest outline. See
-**[syllables & folding](syllables.md)** for the full rule, both directions it runs in, and its
-known limits. Only **single-stroke** suffixes above take part in this — the two-syllable table
+**[syllables & folding](syllables.md)** for the full rule, all three directions it runs in (this
+one, a leading-consonant prefix, and two whole words back to back — `myself` is `my` + `self`), and
+its known limits. Only **single-stroke** suffixes above take part in this — the two-syllable table
 just above (`-ism`, `-ary`/`-ery`/`-ory`, `-ical`, `-logy`, `-ity`/`-ety`, `-cy`/`-sy`,
 `-ify`/`-fy`) isn't matched by it yet, since recognising a word's last *two* syllables together as
 one of these needs its own check, not a straightforward extension of the one-syllable case.
