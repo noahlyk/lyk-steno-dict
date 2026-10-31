@@ -1827,6 +1827,119 @@ mod tests {
         }
     }
 
+    fn candidate(text: &str) -> Candidate {
+        Candidate { outline: parse_outline(text).unwrap(), origin: Origin::Rules, cost: 0 }
+    }
+
+    /// A small, hand-worked bipartite graph, checked against a by-hand-computed optimum before
+    /// trusting `solve_contested` against the real dictionary (plan verification step 2). Three
+    /// words, deliberately overlapping candidates:
+    ///
+    /// - `a` can take `T` (edge cost 1,000) or `K` (edge cost 2,000)
+    /// - `b` can take `T` (edge cost 50) or `K` (edge cost 80)
+    /// - `c` can take `K` (edge cost 1) or `P` (edge cost 50)
+    ///
+    /// Only two perfect matchings exist (every word must get a distinct text): `a`=T,`b`=K,`c`=P
+    /// costs 1,000 + 80 + 50 = 1,130; `a`=K,`b`=T,`c`=P costs 2,000 + 50 + 50 = 2,100 (any
+    /// assignment giving `c` its own cheapest, `K`, leaves `a` and `b` both needing `T`, which
+    /// isn't a perfect matching). The cheaper one is the only correct answer.
+    #[test]
+    fn solve_contested_matches_a_small_hand_worked_optimum() {
+        let contested: Vec<(&str, Vec<(Candidate, u64)>)> = vec![
+            ("a", vec![(candidate("T"), 1_000), (candidate("K"), 2_000)]),
+            ("b", vec![(candidate("T"), 50), (candidate("K"), 80)]),
+            ("c", vec![(candidate("K"), 1), (candidate("P"), 50)]),
+        ];
+        let chosen = solve_contested(&contested);
+        let text_of = |word: &str, index: usize| -> String {
+            let (_, candidates) = contested.iter().find(|(w, _)| *w == word).unwrap();
+            render_outline(&candidates[index].0.outline)
+        };
+        assert_eq!(text_of("a", chosen[&"a"]), "T");
+        assert_eq!(text_of("b", chosen[&"b"]), "K");
+        assert_eq!(text_of("c", chosen[&"c"]), "P");
+    }
+
+    /// A second hand-worked case, specifically to confirm this is genuine global optimization and
+    /// not "give the cheapest text to whichever word is worth the most": `d` can take `T` (edge
+    /// cost 10) or `K` (edge cost 500); `e` can take `T` (edge cost 100) or `K` (edge cost 200).
+    /// `e`'s own edges cost more in absolute terms (it is the "more valuable" word, in the sense
+    /// that satisfying it is expensive either way), but the cheapest *total* is still `d`=T, `e`=K
+    /// (10 + 200 = 210), not `d`=K, `e`=T (500 + 100 = 600) - `d` cannot tolerate losing `T` nearly
+    /// as well as `e` can tolerate losing it, which a naive "richest word wins the cheapest slot"
+    /// rule would get backwards.
+    #[test]
+    fn solve_contested_minimizes_total_cost_not_the_richest_words_own_pick() {
+        let contested: Vec<(&str, Vec<(Candidate, u64)>)> = vec![
+            ("d", vec![(candidate("T"), 10), (candidate("K"), 500)]),
+            ("e", vec![(candidate("T"), 100), (candidate("K"), 200)]),
+        ];
+        let chosen = solve_contested(&contested);
+        let text_of = |word: &str, index: usize| -> String {
+            let (_, candidates) = contested.iter().find(|(w, _)| *w == word).unwrap();
+            render_outline(&candidates[index].0.outline)
+        };
+        assert_eq!(text_of("d", chosen[&"d"]), "T");
+        assert_eq!(text_of("e", chosen[&"e"]), "K");
+    }
+
+    #[test]
+    fn solve_contested_handles_a_larger_random_bipartite_graph() {
+        // A brute-force cross-check at a size too large to verify by hand: 8 words, each with 2-4
+        // candidate texts drawn from a shared pool of 10, deterministic pseudo-random costs. Brute
+        // force enumerates every perfect matching directly; the solver must find the same optimum.
+        let mut seed: u64 = 12345;
+        let mut rand = move || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        let texts = ["S", "T", "K", "P", "W", "H", "R", "A", "O", "E"];
+        let words: Vec<&str> = vec!["w0", "w1", "w2", "w3", "w4", "w5", "w6", "w7"];
+        let mut options: Vec<Vec<(usize, u64)>> = Vec::new();
+        for _ in &words {
+            let n = 2 + (rand() % 3) as usize;
+            let mut chosen: Vec<usize> = Vec::new();
+            while chosen.len() < n {
+                let t = (rand() % texts.len() as u64) as usize;
+                if !chosen.contains(&t) {
+                    chosen.push(t);
+                }
+            }
+            let opts: Vec<(usize, u64)> = chosen.into_iter().map(|t| (t, 1 + rand() % 1000)).collect();
+            options.push(opts);
+        }
+        let contested: Vec<(&str, Vec<(Candidate, u64)>)> = words
+            .iter()
+            .zip(&options)
+            .map(|(&w, opts)| (w, opts.iter().map(|&(t, cost)| (candidate(texts[t]), cost)).collect()))
+            .collect();
+
+        // Brute force: try every assignment of a distinct text index to each word, keeping the
+        // cheapest one that is a perfect matching.
+        fn brute(options: &[Vec<(usize, u64)>], i: usize, used: &mut Vec<usize>, cost: u64, best: &mut Option<u64>) {
+            if i == options.len() {
+                *best = Some(best.map_or(cost, |b| b.min(cost)));
+                return;
+            }
+            for &(t, c) in &options[i] {
+                if !used.contains(&t) {
+                    used.push(t);
+                    brute(options, i + 1, used, cost + c, best);
+                    used.pop();
+                }
+            }
+        }
+        let mut best = None;
+        brute(&options, 0, &mut Vec::new(), 0, &mut best);
+        let want = best.expect("a perfect matching exists for this graph");
+
+        let chosen = solve_contested(&contested);
+        let got: u64 = words.iter().enumerate().map(|(i, w)| options[i][chosen[w]].1).sum();
+        assert_eq!(got, want, "solver found {got}, brute force found the true optimum {want}");
+    }
+
     #[test]
     fn a_standalone_suffixs_own_entry_never_wins_cheapest_even_when_shorter() {
         // "less" is both a real word (HRES, 4 keys) and the display text of the standalone
