@@ -57,5 +57,8 @@ overall number up top, and the full breakdown (every table, auto-checked against
 
 **[The roadmap](roadmap.md)** is not part of this reading order — it's a working plan, not theory.
 
+**[Decisions](decisions.md)** is also not part of this reading order — a maintainer's log of why
+real changes landed the way they did, so none of them get silently reverted by accident.
+
 If you only have time for one chapter: start at 1 and keep going: it's written to be read straight
 through, not sampled.
