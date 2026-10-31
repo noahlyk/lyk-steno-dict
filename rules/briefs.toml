@@ -257,3 +257,12 @@ public = "PUBLG"        # the rules' own reading, one key fewer than the deploye
 # no trace of the word's real first sound at all. Pinned to the rules' own correct phonetic
 # reading instead, which also matches Lapwing exactly.
 make = "PHAEUBG"
+
+# "but" is the same pattern: Plover's own dictionary has no single-stroke "UT" entry for "but" at
+# all (checked the raw dictionary file directly) - its real entries are PWU, PWUT, PWHUT, PWUTS,
+# PWUTD, WUT, and a two-stroke PWUT/UT. "WUT" uses bare "W" for "but"'s real /b/ sound (the full
+# chord is "PW"); the fragment-safety check flags the bare W and deletes it outright, landing on
+# "UT" - a candidate that was never one of Plover's own answers to begin with, with zero trace of
+# the word's actual first sound. Pinned to the rules' own correct phonetic reading, which also
+# matches Lapwing exactly.
+but = "PWUT"

@@ -306,6 +306,22 @@ keystroke actually reaches. **Known, accepted gap**: "dye"/"singe" keep their `e
 real English specifically to stay visually distinct from "die"/"sing" - not special-cased, since
 these are rare exceptions to an otherwise reliable general rule, not a sign the rule is wrong.
 
+**`but` = `UT` was the `make`/`AEUBG` bug again, not a real win (`rules/briefs.toml`:
+`but = "PWUT"`).** `UT` looked like a genuine terse win over both Plover's `PWU` and Lapwing's
+`PWUT` - but checking Plover's real dictionary file directly, there is no single-stroke `UT` entry
+for "but" anywhere in it. Its actual entries are `PWU`, `PWUT`, `PWHUT`, `PWUTS`, `PWUTD`, `WUT`,
+and a two-stroke `PWUT/UT`. `WUT` uses bare `W` for "but"'s real `/b/` sound (the full chord is
+`PW`); the same fragment-safety check that produced `make`'s bug flagged the bare `W` and deleted
+it outright, landing on `UT` - a candidate that was never one of Plover's own answers, with zero
+trace of the word's actual first sound. Pinned to the correct phonetic reading, `PWUT`, which also
+matches Lapwing exactly. Cost the quote-corpus benchmark a small amount of real ground (lyk's
+Lapwing win rate 74.8% vs the 1.2%/7.5% aggregate savings thresholds, down slightly from before) -
+thresholds lowered to match in the same commit, same as every other real-but-small regression this
+session accepted for correctness. **If `but` is ever "optimized" back toward `UT`, it is
+reintroducing this exact bug, not finding a real improvement** - check `matches_real_consonants`
+for a bare, partial-chord Plover candidate before trusting any single-stroke win that looks too
+good, the same lesson `make` already taught once.
+
 ## Two rules that override any of the above
 
 These were stated repeatedly and are not up for silent renegotiation by a future change:
