@@ -5,10 +5,16 @@
 
 mod analysis;
 mod data;
+#[cfg(test)]
+mod dictionary_fixture;
 mod fetch;
 mod generate;
 mod gold;
 mod quote;
+#[cfg(test)]
+mod quote_corpus;
+#[cfg(test)]
+mod quality;
 mod reverse;
 mod rules;
 mod stroke;

@@ -76,17 +76,22 @@ fn outline_of(
         .unwrap_or_else(|| "-".to_owned())
 }
 
-/// Grab a random quote, build the dictionary, and print it stroke by stroke next to Plover and
-/// Lapwing: the keys each theory spends on the same, unpicked text.
-pub fn run(setup: &Setup, briefs: &Briefs, common: usize, max_words: usize) -> Result<()> {
-    let (quote, author) = fetch(max_words, 5)?;
-    println!("\"{quote}\"\n  — {author}\n");
+/// One word of a passage, next to what Plover and Lapwing would write for it: `"-"` for a theory
+/// with nothing on record. The same comparison `quote` prints and the quote-corpus benchmark
+/// (`src/quote_corpus.rs`) scores — one computation, so the benchmark can never drift from what the
+/// live command actually shows.
+pub struct Row {
+    pub word: String,
+    pub lyk: String,
+    pub plover: String,
+    pub lapwing: String,
+}
 
-    let generated = generate::generate(setup, briefs, common)?;
-    let lyk = generate::cheapest(&generated.entries);
-
-    let rows: Vec<(String, String, String, String)> = quote
-        .split_whitespace()
+/// `text`'s plain words, each next to lyk's, Plover's, and Lapwing's own outline for it. `lyk` is
+/// `generate::cheapest` over a real `generate::generate` run, built once by the caller and shared
+/// across as many passages as it's asked about.
+pub fn rows_for(setup: &Setup, lyk: &std::collections::HashMap<&str, &[Stroke]>, text: &str) -> Vec<Row> {
+    text.split_whitespace()
         .filter_map(clean)
         .map(|word| {
             let plover = setup
@@ -101,28 +106,48 @@ pub fn run(setup: &Setup, briefs: &Briefs, common: usize, max_words: usize) -> R
                 .get(&word)
                 .and_then(|o| generate::shortest(o))
                 .map_or_else(|| "-".to_owned(), |o| render_outline(&o));
-            let ours = outline_of(setup, &lyk, &word);
-            (word, ours, plover, lapwing)
+            let lyk = outline_of(setup, lyk, &word);
+            Row { word, lyk, plover, lapwing }
         })
-        .collect();
+        .collect()
+}
+
+/// An outline's cost, `None` for `"-"` (nothing on record) or anything else unparseable: strokes,
+/// then keys.
+pub fn cost(outline: &str) -> Option<(usize, u32)> {
+    if outline == "-" {
+        return None;
+    }
+    let parsed = crate::stroke::parse_outline(outline)?;
+    Some((parsed.len(), generate::keys(&parsed)))
+}
+
+/// Grab a random quote, build the dictionary, and print it stroke by stroke next to Plover and
+/// Lapwing: the keys each theory spends on the same, unpicked text.
+pub fn run(setup: &Setup, briefs: &Briefs, common: usize, max_words: usize) -> Result<()> {
+    let (quote, author) = fetch(max_words, 5)?;
+    println!("\"{quote}\"\n  — {author}\n");
+
+    let generated = generate::generate(setup, briefs, common)?;
+    let lyk = generate::cheapest(&generated.entries);
+    let rows = rows_for(setup, &lyk, &quote);
     if rows.is_empty() {
         bail!("the quote had no plain words to stroke");
     }
 
-    let width = rows.iter().map(|(w, ..)| w.len()).max().unwrap_or(4).max(4);
+    let width = rows.iter().map(|r| r.word.len()).max().unwrap_or(4).max(4);
     println!(
         "{:<width$}  {:<12}  {:<12}  {:<12}",
         "word", "lyk", "plover", "lapwing"
     );
     let mut total = [0u32; 3];
-    for (word, ours, plover, lapwing) in &rows {
-        for (n, text) in [ours, plover, lapwing].into_iter().enumerate() {
-            if text != "-" {
-                total[n] +=
-                    crate::generate::keys(&crate::stroke::parse_outline(text).unwrap_or_default());
+    for row in &rows {
+        for (n, text) in [&row.lyk, &row.plover, &row.lapwing].into_iter().enumerate() {
+            if let Some((_, keys)) = cost(text) {
+                total[n] += keys;
             }
         }
-        println!("{word:<width$}  {ours:<12}  {plover:<12}  {lapwing:<12}");
+        println!("{:<width$}  {:<12}  {:<12}  {:<12}", row.word, row.lyk, row.plover, row.lapwing);
     }
     println!(
         "{:<width$}  {:<12}  {:<12}  {:<12}",

@@ -266,14 +266,12 @@ fn ladder(outline: &[Stroke], join: bool) -> Vec<(u8, Vec<Stroke>)> {
     steps
 }
 
-pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generated> {
-    let mut taken: HashMap<String, String> = HashMap::new();
-    let mut entries: Vec<Entry> = Vec::new();
-    let mut pinned: HashSet<String> = HashSet::new();
-
-    // Reserved first of all, ahead of even the suffixes: a stroke a real keymux config already
-    // gives to a command, a punctuation mark, or fingerspelling is never available to a word,
-    // whatever the rules would have generated for it.
+/// Every outline a real keymux config already gives to a command, a punctuation mark, or
+/// fingerspelling - never available to a word, whatever the rules would have generated for it.
+/// Pulled out of [`generate`] so a test can confirm the invariant it exists to guarantee (no
+/// generated word ever lands on one of these) without re-deriving this list by hand.
+pub(crate) fn reserved_outlines() -> Result<HashMap<String, String>> {
+    let mut taken = HashMap::new();
     for (kind, json) in RESERVED {
         let strokes: HashMap<String, String> = serde_json::from_str(json)
             .with_context(|| format!("rules/reserved: {kind} dictionary"))?;
@@ -285,6 +283,13 @@ pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generat
             taken.entry(text).or_insert_with(|| format!("reserved ({kind})"));
         }
     }
+    Ok(taken)
+}
+
+pub fn generate(setup: &Setup, briefs: &Briefs, common: usize) -> Result<Generated> {
+    let mut taken: HashMap<String, String> = reserved_outlines()?;
+    let mut entries: Vec<Entry> = Vec::new();
+    let mut pinned: HashSet<String> = HashSet::new();
 
     // Standalone suffixes, first of all: a word that would otherwise land on the same outline
     // as one of these loses to it, the same way a brief does, since a suffix is struck on its

@@ -190,6 +190,30 @@ correct briefs for the most common words in the language. A specific word that s
 learner (`make`, say) gets a one-off `[word]` override in `rules/briefs.toml`, the normal path for
 "someone looked at this one and decided differently" - zero blast radius on the other 112.
 
+**A real test suite: a hardcoded quote corpus, and structural QA guards.** Every check of "is lyk
+actually terser" so far was a human running `quote` by hand and eyeballing a table - no regression
+test ever failed if a rule change quietly made the theory worse. `src/quote_corpus.rs` hardcodes
+~100 passages (public-domain lines plus plain, unremarkable prose written for the file - deliberately
+*not* a curated set that would flatter lyk, since that would measure the curation, not the theory)
+and scores every one exactly the way the live `quote` command does (`quote::rows_for`/`quote::cost`,
+shared code, not a reimplementation), then asserts against thresholds set just under a real, actual
+run: 103 passages, lyk beat Plover outright on 60 (58.3%) and Lapwing on 76 (73.8%); of 1,216 words,
+lyk cost fewer keys than Plover on 18.2% and Lapwing on 33.0% (and cost *more* on only 9.5% / 5.2%);
+aggregate keys across the whole corpus: lyk 4,640, Plover 4,694, Lapwing 5,039 (lyk is 1.2% cheaper
+than Plover, 7.9% cheaper than Lapwing, in aggregate). Thresholds were set a few points under these
+numbers - deliberately harsh, not a loose sanity floor: a real regression should fail this
+immediately, and a real improvement should raise the constants back up in the same commit, not
+leave them stranded low. `src/quality.rs` adds structural QA guards unrelated to terseness - no two
+words ever sharing a stroke, every sufficiently common pronounceable word actually having an
+outline (the exact kind of check that would have caught the `don't` bug the day it shipped, instead
+of a live user hitting it), the stranded-word count not silently growing past its known baseline
+(10), and no generated word colliding with a reserved command/punctuation/fingerspelling stroke.
+Both share one production-scale dictionary build (`src/dictionary_fixture.rs`, a `LazyLock`) rather
+than paying the few-second `generate()` cost per test - the whole suite (32 tests) runs in ~5
+seconds. **If this corpus or these thresholds get deleted "to make CI faster," every regression
+this session fixed by hand (and ones nobody's found yet) can silently come back with nothing to
+catch them.**
+
 ## Two rules that override any of the above
 
 These were stated repeatedly and are not up for silent renegotiation by a future change:
