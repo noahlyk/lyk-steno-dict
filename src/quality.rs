@@ -78,6 +78,43 @@ fn stranded_word_count_has_not_grown_past_its_known_baseline() {
     );
 }
 
+/// Plan verification step 5 for the candidate-enumeration-and-solver rewrite (see
+/// `docs/decisions.md`): the whole algorithm choice (successive shortest augmenting paths over the
+/// *contested* subgraph only, split further into independent connected components, rather than a
+/// dense assignment algorithm over the full dictionary) rests on fixed-point peeling settling most
+/// of the dictionary on its own, leaving only a real minority still needing the solver's own
+/// frequency-weighted arbitration - a fact this checks directly against the real, built dictionary
+/// rather than trusting it by assumption.
+///
+/// The threshold is *not* the plan's own original estimate ("hundreds to low thousands", under 5%)
+/// - a real run measured roughly a quarter of the dictionary genuinely contested, not under 5%,
+/// because the blanket `matches_real_consonants` filter's deeper fragment-drops mean far more words
+/// now legitimately converge on the same small handful of very short, nearly-bare outlines than a
+/// single-source brief pool ever produced. That is a real, now-measured property of this design,
+/// not a bug to chase back down - connected-component splitting is what actually keeps each solve
+/// small in practice (see `generate`'s own doc), not a low raw contested-word count. This guard
+/// exists for the failure mode that *is* a bug: the contested set swallowing nearly the whole
+/// dictionary the way an earlier, incorrect peeling test once did (confirmed directly: that bug
+/// measured 99.3% contested, not ~25%).
+#[test]
+fn the_contested_set_after_peeling_stays_a_minority_of_the_dictionary() {
+    const CONTESTED_SHARE_MAX: f64 = 0.35;
+    let generated = dictionary_fixture::generated();
+    let lyk = dictionary_fixture::cheapest();
+    let share = generated.contested as f64 / lyk.len() as f64;
+    assert!(
+        share <= CONTESTED_SHARE_MAX,
+        "{:.1}% of the dictionary ({} of {} words) was still contested after fixed-point peeling, \
+         want <= {:.0}% - peeling itself likely regressed back toward treating a word's full \
+         candidate-list length as the test, rather than whether its own cheapest candidate is \
+         uniquely its own (see `generate`'s own peeling doc)",
+        share * 100.0,
+        generated.contested,
+        lyk.len(),
+        CONTESTED_SHARE_MAX * 100.0
+    );
+}
+
 /// `generate::reserved_outlines` is seeded into `taken` before a single word is placed
 /// specifically so this can never happen; this confirms it from the outside, against the real
 /// built dictionary, rather than trusting the seeding order inside `generate()` never regresses.
